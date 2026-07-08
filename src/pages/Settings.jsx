@@ -21,7 +21,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AddIcon, DeleteIcon, EditIcon, SaveIcon } from '../components/AppIcons.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
 import { goalColors, initialData } from '../data/initialData.js';
@@ -29,6 +29,7 @@ import { useFinance } from '../context/FinanceContext.jsx';
 import { exportStateToJson, importStateFromJson } from '../services/storageService.js';
 import { getInvestmentReturns } from '../utils/financeUtils.js';
 import { formatCurrency } from '../utils/formatters.js';
+import { CircularProgress } from '@mui/material';
 
 const emptyGoal = { name: '', targetAmount: '', currentAmount: '', color: goalColors[0], status: 'activa' };
 const emptyInvestment = { name: '', capital: '', annualRate: '' };
@@ -43,6 +44,7 @@ export default function Settings() {
   const [goalEditForm, setGoalEditForm] = useState(emptyGoal);
   const [investmentEditForm, setInvestmentEditForm] = useState(emptyInvestment);
   const [expenseEditForm, setExpenseEditForm] = useState(emptyExpense);
+  const [isJsonProcessing, setIsJsonProcessing] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [editingInvestment, setEditingInvestment] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -56,6 +58,10 @@ export default function Settings() {
   const showAlert = (message, severity = 'success') => {
     setAlert({ open: true, message, severity });
   };
+
+  useEffect(() => {
+    setSettings(state.settings);
+  }, [state.settings]);
 
   const handleCloseAlert = (event, reason) => {
     if (reason === 'clickaway') return;
@@ -146,14 +152,19 @@ export default function Settings() {
   };
 
   const handleExportData = () => {
-    const blob = new Blob([exportStateToJson(state)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `finanzas-personales-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    showAlert('Copia de seguridad exportada correctamente', 'success');
+    try {
+      setIsJsonProcessing(true);
+      const blob = new Blob([exportStateToJson(state)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `finanzas-personales-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showAlert('Copia de seguridad exportada correctamente', 'success');
+    } finally {
+      setIsJsonProcessing(false);
+    }
   };
 
   const handleImportData = async (event) => {
@@ -161,6 +172,7 @@ export default function Settings() {
     if (!file) return;
 
     try {
+      setIsJsonProcessing(true);
       const text = await file.text();
       const importedState = importStateFromJson(text, initialData);
       dispatch({ type: 'REPLACE_STATE', payload: importedState });
@@ -169,6 +181,7 @@ export default function Settings() {
       showAlert('No se pudo importar el archivo. Asegúrate de subir un JSON válido.', 'error');
     } finally {
       event.target.value = '';
+      setIsJsonProcessing(false);
     }
   };
 
@@ -179,9 +192,13 @@ export default function Settings() {
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
             <Typography variant="h6">Respaldo y restauración</Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <Button variant="outlined" onClick={handleExportData}>Exportar JSON</Button>
-              <Button variant="contained" onClick={() => fileInputRef.current?.click()}>Importar JSON</Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+              <Button variant="outlined" onClick={handleExportData} disabled={isJsonProcessing}>
+                {isJsonProcessing ? <CircularProgress size={18} /> : 'Exportar JSON'}
+              </Button>
+              <Button variant="contained" onClick={() => fileInputRef.current?.click()} disabled={isJsonProcessing}>
+                {isJsonProcessing ? 'Procesando...' : 'Importar JSON'}
+              </Button>
             </Stack>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
