@@ -159,7 +159,7 @@ export function summarizeFinances(state, date = new Date()) {
   const dailyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.dailyReturn, 0);
   const monthlyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.monthlyReturn, 0);
   const savingsThisMonth = Number(settings.weeklySalary || 0) * 4 + monthlyIncome + monthlyReturns - monthlyExpenses - automaticWeekly;
-  const netWorth = Number(settings.currentNetWorth || 0) + monthlyReturns - weeklyExpenses;
+  const netWorth = Number(settings.currentNetWorth || 0) + monthlyReturns;
   const goalsProgress = goals.map((goal) => {
     const isCompleted = goal.status === 'terminada';
     return {

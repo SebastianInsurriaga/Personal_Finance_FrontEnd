@@ -5,6 +5,11 @@ import { removeExpiredFixedExpenses } from '../utils/financeUtils.js';
 
 const FinanceContext = createContext(null);
 
+function getMovementEffect(movement) {
+  const amount = Number(movement.amount || 0);
+  return movement.type === 'Ingreso' ? amount : -amount;
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'TOGGLE_MODE':
@@ -35,20 +40,19 @@ function reducer(state, action) {
       return { ...state, fixedExpenses: action.payload };
     case 'ADD_MOVEMENT': {
       const movement = { ...action.payload, id: crypto.randomUUID() };
-      const amount = Number(movement.amount || 0);
       return {
         ...state,
         settings: {
           ...state.settings,
-          currentNetWorth: Number(state.settings.currentNetWorth || 0) + (movement.type === 'Ingreso' ? amount : -amount),
+          currentNetWorth: Number(state.settings.currentNetWorth || 0) + getMovementEffect(movement),
         },
         movements: [movement, ...state.movements],
       };
     }
     case 'UPDATE_MOVEMENT': {
       const oldMovement = state.movements.find((movement) => movement.id === action.payload.id);
-      const oldEffect = oldMovement ? (oldMovement.type === 'Ingreso' ? Number(oldMovement.amount || 0) : -Number(oldMovement.amount || 0)) : 0;
-      const newEffect = action.payload.type === 'Ingreso' ? Number(action.payload.amount || 0) : -Number(action.payload.amount || 0);
+      const oldEffect = oldMovement ? getMovementEffect(oldMovement) : 0;
+      const newEffect = getMovementEffect(action.payload);
       return {
         ...state,
         settings: {
@@ -61,7 +65,7 @@ function reducer(state, action) {
     case 'DELETE_MOVEMENT': {
       const movementToRemove = state.movements.find((movement) => movement.id === action.payload);
       if (!movementToRemove) return state;
-      const effect = movementToRemove.type === 'Ingreso' ? Number(movementToRemove.amount || 0) : -Number(movementToRemove.amount || 0);
+      const effect = getMovementEffect(movementToRemove);
       return {
         ...state,
         settings: {
