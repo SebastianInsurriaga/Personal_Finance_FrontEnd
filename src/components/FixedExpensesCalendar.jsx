@@ -1,6 +1,6 @@
 import { Box, Chip, Stack, Typography } from '@mui/material';
 
-const weekdayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const weekdayLabels = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
 function getCellTone(events) {
   if (events.some((event) => event.status === 'vencido')) {
