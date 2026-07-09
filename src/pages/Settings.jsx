@@ -33,7 +33,7 @@ import { CircularProgress } from '@mui/material';
 
 const emptyGoal = { name: '', targetAmount: '', currentAmount: '', color: goalColors[0], status: 'activa' };
 const emptyInvestment = { name: '', capital: '', annualRate: '' };
-const emptyExpense = { name: '', type: 'Semanal', amount: '', dayOfMonth: '', automatic: true, active: true };
+const emptyExpense = { name: '', type: 'Semanal', amount: '', dayOfMonth: '', dueDate: '', automatic: true, active: true };
 
 export default function Settings() {
   const { state, dispatch } = useFinance();
@@ -89,6 +89,10 @@ export default function Settings() {
 
   const addExpense = () => {
     if (!expense.name) return;
+    if (expense.type === 'Única' && !expense.dueDate) {
+      showAlert('Selecciona una fecha de vencimiento para el gasto único.', 'error');
+      return;
+    }
     dispatch({ type: 'ADD_FIXED_EXPENSE', payload: normalizeNumbers(expense) });
     setExpense({ ...emptyExpense });
     showAlert('Gasto fijo agregado con éxito', 'success');
@@ -146,6 +150,10 @@ export default function Settings() {
 
   const saveExpense = () => {
     if (!expenseEditForm.name) return;
+    if (expenseEditForm.type === 'Única' && !expenseEditForm.dueDate) {
+      showAlert('Selecciona una fecha de vencimiento para el gasto único.', 'error');
+      return;
+    }
     dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...normalizeNumbers(expenseEditForm), id: editingExpense.id } });
     showAlert('Gasto fijo actualizado con éxito', 'success');
     closeExpenseEditor();
@@ -285,11 +293,12 @@ export default function Settings() {
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Gastos fijos</Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr auto auto auto' }, gap: 2, mb: 3, alignItems: 'center' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr auto auto' }, gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField label="Nombre" value={expense.name} onChange={(event) => setExpense({ ...expense, name: event.target.value })} />
-            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expense.type} onChange={(event) => setExpense({ ...expense, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem></Select></FormControl>
+            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expense.type} onChange={(event) => setExpense({ ...expense, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
             <MoneyField label="Monto" value={expense.amount} onChange={(amount) => setExpense({ ...expense, amount })} />
-            <TextField type="number" label="Día del mes" disabled={expense.type === 'Semanal'} value={expense.dayOfMonth} onChange={(event) => setExpense({ ...expense, dayOfMonth: event.target.value })} />
+            <TextField type="number" label="Día del mes" disabled={expense.type === 'Semanal' || expense.type === 'Única'} value={expense.dayOfMonth} onChange={(event) => setExpense({ ...expense, dayOfMonth: event.target.value })} />
+            <TextField type="date" label="Fecha de vencimiento" disabled={expense.type !== 'Única'} value={expense.dueDate || ''} onChange={(event) => setExpense({ ...expense, dueDate: event.target.value })} InputLabelProps={{ shrink: true }} />
             <ToggleLabel label="Automático" checked={expense.automatic} onChange={(automatic) => setExpense({ ...expense, automatic })} />
             <ToggleLabel label="Activo" checked={expense.active} onChange={(active) => setExpense({ ...expense, active })} />
             <Button variant="contained" startIcon={<AddIcon />} onClick={addExpense}>Agregar</Button>
@@ -300,7 +309,7 @@ export default function Settings() {
                 <Typography fontWeight={700}>{item.name}</Typography>
                 <Chip label={item.type} />
                 <Chip label={formatCurrency(item.amount)} />
-                <Chip label={item.type === 'Mensual' ? `Día ${item.dayOfMonth || '-'}` : 'Cada semana'} color="info" />
+                <Chip label={item.type === 'Mensual' ? `Día ${item.dayOfMonth || '-'}` : item.type === 'Única' ? `Vence ${item.dueDate || '-'}` : 'Cada semana'} color="info" />
                 <Chip label={item.automatic ? 'Automático' : 'Manual'} color={item.automatic ? 'primary' : 'default'} />
                 <Chip label={item.active ? 'Activo' : 'Inactivo'} color={item.active ? 'success' : 'default'} />
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -351,11 +360,12 @@ export default function Settings() {
       <Dialog open={expenseDialogOpen} onClose={closeExpenseEditor} maxWidth="md" fullWidth>
         <DialogTitle>Editar gasto fijo</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr auto auto' }, gap: 2, mt: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr auto' }, gap: 2, mt: 1, alignItems: 'center' }}>
             <TextField label="Nombre" value={expenseEditForm.name} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, name: event.target.value })} />
-            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expenseEditForm.type} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem></Select></FormControl>
+            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expenseEditForm.type} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
             <MoneyField label="Monto" value={expenseEditForm.amount} onChange={(amount) => setExpenseEditForm({ ...expenseEditForm, amount })} />
-            <TextField type="number" label="Día del mes" disabled={expenseEditForm.type === 'Semanal'} value={expenseEditForm.dayOfMonth} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, dayOfMonth: event.target.value })} />
+            <TextField type="number" label="Día del mes" disabled={expenseEditForm.type === 'Semanal' || expenseEditForm.type === 'Única'} value={expenseEditForm.dayOfMonth} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, dayOfMonth: event.target.value })} />
+            <TextField type="date" label="Fecha de vencimiento" disabled={expenseEditForm.type !== 'Única'} value={expenseEditForm.dueDate || ''} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, dueDate: event.target.value })} InputLabelProps={{ shrink: true }} />
             <ToggleLabel label="Automático" checked={expenseEditForm.automatic} onChange={(automatic) => setExpenseEditForm({ ...expenseEditForm, automatic })} />
             <ToggleLabel label="Activo" checked={expenseEditForm.active} onChange={(active) => setExpenseEditForm({ ...expenseEditForm, active })} />
           </Box>

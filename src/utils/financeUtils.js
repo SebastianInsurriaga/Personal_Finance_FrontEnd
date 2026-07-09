@@ -1,4 +1,4 @@
-import { daysUntilMonthlyDay, endOfMonth, endOfWeek, isBetween, startOfMonth, startOfWeek } from './dateUtils.js';
+import { endOfMonth, endOfWeek, isBetween, startOfMonth, startOfWeek, toDate } from './dateUtils.js';
 
 export function getInvestmentReturns(investments) {
   return investments.map((investment) => {
@@ -13,11 +13,34 @@ export function getInvestmentReturns(investments) {
 }
 
 export function getAutomaticFixedExpenses(fixedExpenses, date = new Date()) {
-  const today = date.getDate();
+  const weekStart = startOfWeek(date);
+  const weekEnd = endOfWeek(date);
+  const currentDate = toDate(date);
+
   return fixedExpenses.filter((expense) => {
     if (!expense.active || !expense.automatic) return false;
     if (expense.type === 'Semanal') return true;
-    return Number(expense.dayOfMonth) <= today;
+
+    if (expense.type === 'Única') {
+      if (!expense.dueDate) return false;
+      const dueDate = toDate(expense.dueDate);
+      return isBetween(dueDate, weekStart, weekEnd);
+    }
+
+    const day = Number(expense.dayOfMonth);
+    if (!day) return false;
+    const dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    return isBetween(dueDate, weekStart, weekEnd);
+  });
+}
+
+export function removeExpiredFixedExpenses(fixedExpenses, date = new Date()) {
+  const today = new Date(toDate(date).getFullYear(), toDate(date).getMonth(), toDate(date).getDate());
+
+  return fixedExpenses.filter((expense) => {
+    if (expense.type !== 'Única' || !expense.dueDate) return true;
+    const dueDate = toDate(expense.dueDate);
+    return dueDate >= today;
   });
 }
 
@@ -28,6 +51,19 @@ function getExpensePaymentMeta(expense, date = new Date()) {
       daysUntil: Math.max(0, daysUntil),
       status: daysUntil <= 3 ? 'proximo' : 'normal',
       label: `${expense.type === 'Semanal' ? 'Cada semana' : `Día ${expense.dayOfMonth}`} • ${daysUntil === 0 ? 'hoy' : `en ${daysUntil} días`}`,
+    };
+  }
+
+  if (expense.type === 'Única') {
+    const targetDate = toDate(expense.dueDate);
+    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const isOverdue = targetDate < today;
+    const daysUntil = isOverdue ? 0 : Math.ceil((targetDate - today) / 86400000);
+
+    return {
+      daysUntil,
+      status: isOverdue ? 'vencido' : daysUntil <= 3 ? 'proximo' : 'normal',
+      label: `Única • ${isOverdue ? 'vencido' : daysUntil === 0 ? 'hoy' : `en ${daysUntil} días`}`,
     };
   }
 
@@ -50,11 +86,16 @@ export function getFixedExpensesCalendar(fixedExpenses, date = new Date()) {
   const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
 
   const eventsByDate = fixedExpenses.reduce((acc, expense) => {
-    if (!expense.active || expense.type !== 'Mensual' || !expense.dayOfMonth) return acc;
-    const day = Number(expense.dayOfMonth);
-    if (day < 1 || day > daysInMonth) return acc;
+    if (!expense.active) return acc;
 
-    const eventDate = new Date(date.getFullYear(), date.getMonth(), day);
+    const eventDate = expense.type === 'Única' && expense.dueDate
+      ? toDate(expense.dueDate)
+      : new Date(date.getFullYear(), date.getMonth(), Number(expense.dayOfMonth || 1));
+
+    if (expense.type === 'Mensual' && (!expense.dayOfMonth || eventDate.getMonth() !== date.getMonth() || eventDate.getFullYear() !== date.getFullYear())) return acc;
+    if (expense.type === 'Única' && (!expense.dueDate || eventDate.getMonth() !== date.getMonth() || eventDate.getFullYear() !== date.getFullYear())) return acc;
+    if (expense.type === 'Semanal') return acc;
+
     const key = eventDate.toISOString().slice(0, 10);
     const eventMeta = getExpensePaymentMeta(expense, date);
 

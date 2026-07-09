@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { initialData } from '../data/initialData.js';
 import { loadState, mergeStateWithFallback, saveState } from '../services/storageService.js';
+import { removeExpiredFixedExpenses } from '../utils/financeUtils.js';
 
 const FinanceContext = createContext(null);
 
@@ -30,6 +31,8 @@ function reducer(state, action) {
       return { ...state, fixedExpenses: state.fixedExpenses.map((expense) => (expense.id === action.payload.id ? action.payload : expense)) };
     case 'DELETE_FIXED_EXPENSE':
       return { ...state, fixedExpenses: state.fixedExpenses.filter((expense) => expense.id !== action.payload) };
+    case 'CLEAN_EXPIRED_FIXED_EXPENSES':
+      return { ...state, fixedExpenses: action.payload };
     case 'ADD_MOVEMENT': {
       const movement = { ...action.payload, id: crypto.randomUUID() };
       const amount = Number(movement.amount || 0);
@@ -81,6 +84,13 @@ export function FinanceProvider({ children }) {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    const cleanedFixedExpenses = removeExpiredFixedExpenses(state.fixedExpenses, new Date());
+    if (cleanedFixedExpenses.length !== state.fixedExpenses.length) {
+      dispatch({ type: 'CLEAN_EXPIRED_FIXED_EXPENSES', payload: cleanedFixedExpenses });
+    }
+  }, [state.fixedExpenses]);
 
   const value = useMemo(
     () => ({
