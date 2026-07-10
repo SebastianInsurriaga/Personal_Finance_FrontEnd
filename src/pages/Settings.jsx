@@ -159,17 +159,46 @@ export default function Settings() {
     closeExpenseEditor();
   };
 
-  const handleExportData = () => {
+  const handleExportData = async () => {
     try {
       setIsJsonProcessing(true);
-      const blob = new Blob([exportStateToJson(state)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `finanzas-personales-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-      showAlert('Copia de seguridad exportada correctamente', 'success');
+      const jsonData = exportStateToJson(state);
+      const userEmail = import.meta.env.VITE_USER_EMAIL;
+
+      if (!userEmail) {
+        showAlert('Por favor, configura VITE_USER_EMAIL en tu .env.local', 'error');
+        return;
+      }
+
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonData,
+          userEmail,
+        }),
+      });
+
+      let errorData;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        errorData = await response.json();
+      } else {
+        const text = await response.text();
+        errorData = { error: text || 'Unknown server error' };
+      }
+
+      if (!response.ok) {
+        throw new Error(errorData.error || errorData.details || 'Error al enviar el email');
+      }
+
+      showAlert('Copia de seguridad enviada a tu correo correctamente', 'success');
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      showAlert(`Error al enviar el email: ${error.message}`, 'error');
     } finally {
       setIsJsonProcessing(false);
     }

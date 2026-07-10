@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+  publish = "dist"
+
+[env]
+  [env.production]
+    GMAIL_USER = ""
+    GMAIL_PASSWORD = ""
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200

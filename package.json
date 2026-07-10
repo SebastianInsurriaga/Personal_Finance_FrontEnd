@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"node server-dev.js\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ."
@@ -16,7 +16,11 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.3",
-    "recharts": "^3.1.0"
+    "recharts": "^3.1.0",
+    "nodemailer": "^6.9.7",
+    "dotenv": "^16.3.1",
+    "concurrently": "^8.2.2",
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "eslint": "^9.30.1",

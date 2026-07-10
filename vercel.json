@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "env": {
+    "GMAIL_USER": "@gmail_user",
+    "GMAIL_PASSWORD": "@gmail_password"
+  }
+}
