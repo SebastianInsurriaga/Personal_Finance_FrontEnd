@@ -1,19 +1,33 @@
 import nodemailer from 'nodemailer';
 
-export default async (req, res) => {
+exports.handler = async (event, context) => {
   // Solo POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
   }
 
   try {
-    const { jsonData, userEmail } = req.body;
+    let body;
+    
+    if (typeof event.body === 'string') {
+      body = JSON.parse(event.body);
+    } else {
+      body = event.body;
+    }
+
+    const { jsonData, userEmail } = body;
 
     if (!jsonData || !userEmail) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        details: 'jsonData and userEmail are required' 
-      });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: 'Missing required fields',
+          details: 'jsonData and userEmail are required' 
+        })
+      };
     }
 
     // Validar variables de entorno
@@ -25,10 +39,13 @@ export default async (req, res) => {
         hasUser: !!gmailUser,
         hasPassword: !!gmailPassword
       });
-      return res.status(500).json({ 
-        error: 'Server configuration error',
-        details: 'Gmail credentials not configured on server'
-      });
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Gmail credentials not configured on server'
+        })
+      };
     }
 
     // Crear transporte de Nodemailer
@@ -45,10 +62,13 @@ export default async (req, res) => {
       await transporter.verify();
     } catch (verifyError) {
       console.error('Gmail authentication failed:', verifyError.message);
-      return res.status(401).json({ 
-        error: 'Gmail authentication failed',
-        details: 'Verify your Gmail credentials in environment variables'
-      });
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ 
+          error: 'Gmail authentication failed',
+          details: 'Verify your Gmail credentials in environment variables'
+        })
+      };
     }
 
     // Preparar el archivo JSON
@@ -76,17 +96,26 @@ export default async (req, res) => {
     });
 
     console.log('Email sent:', info.messageId);
-    res.status(200).json({ 
-      success: true, 
-      message: 'Email enviado correctamente',
-      messageId: info.messageId
-    });
+    
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        success: true, 
+        message: 'Email enviado correctamente',
+        messageId: info.messageId
+      })
+    };
   } catch (error) {
     console.error('Error enviando email:', error);
-    res.status(500).json({ 
-      error: 'Error al enviar el email',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ 
+        error: 'Error al enviar el email',
+        details: error.message
+      })
+    };
   }
 };
