@@ -90,24 +90,27 @@ export default function Movements() {
           <Typography variant="h6" sx={{ mb: 2 }}>Historial</Typography>
           {state.movements.length ? (
             <Stack spacing={1.5}>
-              {state.movements.map((item) => (
-                <Box key={item.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.8fr 1.4fr 1fr 1fr auto' }, gap: 2, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
-                  <Typography color="text.secondary">{item.date}</Typography>
-                  <Box>
-                    <Typography fontWeight={700}>{item.concept}</Typography>
-                    {item.notes && <Typography variant="body2" color="text.secondary">{item.notes}</Typography>}
+              {state.movements
+                .slice()
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map((item) => (
+                  <Box key={item.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.8fr 1.4fr 1fr 1fr auto' }, gap: 2, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                    <Typography color="text.secondary">{item.date}</Typography>
+                    <Box>
+                      <Typography fontWeight={700}>{item.concept}</Typography>
+                      {item.notes && <Typography variant="body2" color="text.secondary">{item.notes}</Typography>}
+                    </Box>
+                    <Typography>{item.category}</Typography>
+                    <Typography fontWeight={700} color={item.type === 'Ingreso' ? 'success.main' : 'error.main'}>{item.type === 'Ingreso' ? '+' : '-'}{formatCurrency(item.amount)}</Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Editar"><IconButton onClick={() => openEditMovement(item)}><EditIcon /></IconButton></Tooltip>
+                      <Tooltip title="Eliminar"><IconButton onClick={() => {
+                        dispatch({ type: 'DELETE_MOVEMENT', payload: item.id });
+                        showAlert('Movimiento eliminado con éxito', 'success');
+                      }}><DeleteIcon /></IconButton></Tooltip>
+                    </Box>
                   </Box>
-                  <Typography>{item.category}</Typography>
-                  <Typography fontWeight={700} color={item.type === 'Ingreso' ? 'success.main' : 'error.main'}>{item.type === 'Ingreso' ? '+' : '-'}{formatCurrency(item.amount)}</Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <Tooltip title="Editar"><IconButton onClick={() => openEditMovement(item)}><EditIcon /></IconButton></Tooltip>
-                    <Tooltip title="Eliminar"><IconButton onClick={() => {
-                      dispatch({ type: 'DELETE_MOVEMENT', payload: item.id });
-                      showAlert('Movimiento eliminado con éxito', 'success');
-                    }}><DeleteIcon /></IconButton></Tooltip>
-                  </Box>
-                </Box>
-              ))}
+                ))}
             </Stack>
           ) : <EmptyState title="Sin movimientos" description="Agrega tu primer ingreso o gasto." />}
         </CardContent>
