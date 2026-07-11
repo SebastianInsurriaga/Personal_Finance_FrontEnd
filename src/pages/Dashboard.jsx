@@ -28,7 +28,7 @@ export default function Dashboard() {
         <StatCard title="Gastado esta semana" value={formatCurrency(summary.weeklyExpenses + summary.automaticWeekly)} subtitle="Gastos manuales + fijos automáticos" icon={<TrendIcon />} color="error.main" />
         <StatCard title="Ahorro del mes" value={formatCurrency(summary.savingsThisMonth)} subtitle={`Meta: ${formatCurrency(summary.monthlySavingsGoal)}`} icon={<SavingsIcon />} color="secondary.main" />
         <StatCard title="Presupuesto semanal" value={formatCurrency(summary.weeklyBudget)} subtitle={`Fijos automáticos: ${formatCurrency(summary.automaticWeekly)}`} icon={<WalletIcon />} color="primary.main" />
-        <StatCard title="Gastado este mes" value={formatCurrency(summary.monthlyExpenses)} subtitle="Solo movimientos registrados" icon={<TrendIcon />} color="warning.main" />
+        <StatCard title="Gastado este mes" value={formatCurrency(summary.monthlyExpenses)} subtitle="Gastos manuales + fijos automáticos" icon={<TrendIcon />} color="warning.main" />
         <StatCard title="Rendimiento diario" value={formatCurrency(summary.dailyReturns)} subtitle="Estimado por inversiones" icon={<TrendIcon />} color="success.main" />
         <StatCard title="Rendimiento mensual" value={formatCurrency(summary.monthlyReturns)} subtitle="Estimado por tasa anual" icon={<TrendIcon />} color="secondary.main" />
       </Box>

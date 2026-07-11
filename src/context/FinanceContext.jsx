@@ -1,13 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { initialData } from '../data/initialData.js';
 import { loadState, mergeStateWithFallback, saveState } from '../services/storageService.js';
-import { removeExpiredFixedExpenses } from '../utils/financeUtils.js';
+import { getMonthlyAutomaticFixedExpenses, removeExpiredFixedExpenses } from '../utils/financeUtils.js';
 
 const FinanceContext = createContext(null);
 
 function getMovementEffect(movement) {
   const amount = Number(movement.amount || 0);
   return movement.type === 'Ingreso' ? amount : -amount;
+}
+
+function getAutomaticNetWorthDelta(state, date = new Date()) {
+  const todayKey = date.toISOString().slice(0, 10);
+  const lastSyncDate = state.settings?.lastNetWorthSyncDate;
+
+  if (!lastSyncDate) {
+    return { delta: getMonthlyAutomaticFixedExpenses(state.fixedExpenses, date), syncDate: todayKey };
+  }
+
+  const latestDate = new Date(lastSyncDate);
+  const previousAmount = getMonthlyAutomaticFixedExpenses(state.fixedExpenses, latestDate);
+  const currentAmount = getMonthlyAutomaticFixedExpenses(state.fixedExpenses, date);
+  const delta = currentAmount - previousAmount;
+
+  return { delta, syncDate: todayKey };
 }
 
 function reducer(state, action) {
@@ -75,6 +91,16 @@ function reducer(state, action) {
         movements: state.movements.filter((movement) => movement.id !== action.payload),
       };
     }
+    case 'SYNC_NET_WORTH': {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          currentNetWorth: Number(state.settings.currentNetWorth || 0) - Number(action.payload.amount || 0),
+          lastNetWorthSyncDate: action.payload.syncDate,
+        },
+      };
+    }
     case 'REPLACE_STATE':
       return mergeStateWithFallback(action.payload, state);
     default:
@@ -95,6 +121,19 @@ export function FinanceProvider({ children }) {
       dispatch({ type: 'CLEAN_EXPIRED_FIXED_EXPENSES', payload: cleanedFixedExpenses });
     }
   }, [state.fixedExpenses]);
+
+  useEffect(() => {
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    const lastSyncDate = state.settings?.lastNetWorthSyncDate;
+
+    if (lastSyncDate === todayKey) return;
+
+    const { delta } = getAutomaticNetWorthDelta(state, today);
+    if (delta !== 0) {
+      dispatch({ type: 'SYNC_NET_WORTH', payload: { amount: delta, syncDate: todayKey } });
+    }
+  }, [state.fixedExpenses, state.movements, state.settings?.currentNetWorth, state.settings?.lastNetWorthSyncDate]);
 
   const value = useMemo(
     () => ({

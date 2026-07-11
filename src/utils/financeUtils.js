@@ -44,6 +44,58 @@ export function removeExpiredFixedExpenses(fixedExpenses, date = new Date()) {
   });
 }
 
+export function getMonthlyAutomaticFixedExpenses(fixedExpenses, date = new Date()) {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  const monthStart = startOfMonth(date);
+  const monthEnd = endOfMonth(date);
+  const selectedDate = toDate(date);
+
+  return fixedExpenses.reduce((sum, expense) => {
+    if (!expense.active || !expense.automatic) return sum;
+    const amount = Number(expense.amount || 0);
+
+    if (expense.type === 'Semanal') {
+      let weekStart = new Date(monthStart);
+      const dayOfWeek = weekStart.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      weekStart.setDate(weekStart.getDate() + mondayOffset);
+      weekStart.setHours(0, 0, 0, 0);
+
+      let weeklyCount = 0;
+      while (weekStart <= selectedDate) {
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        if (weekStart >= monthStart && weekStart <= monthEnd) {
+          weeklyCount += 1;
+        }
+        weekStart.setDate(weekStart.getDate() + 7);
+      }
+
+      return sum + amount * weeklyCount;
+    }
+
+    if (expense.type === 'Única') {
+      if (!expense.dueDate) return sum;
+      const dueDate = toDate(expense.dueDate);
+      if (dueDate.getFullYear() === year && dueDate.getMonth() === month && dueDate <= selectedDate) {
+        return sum + amount;
+      }
+      return sum;
+    }
+
+    if (expense.type === 'Mensual') {
+      const day = Number(expense.dayOfMonth || 1);
+      const dueDate = new Date(year, month, day);
+      if (dueDate > selectedDate) return sum;
+      return sum + amount;
+    }
+
+    return sum;
+  }, 0);
+}
+
 function getExpensePaymentMeta(expense, date = new Date()) {
   if (expense.type === 'Semanal') {
     const daysUntil = 7 - (date.getDay() || 7);
@@ -137,6 +189,29 @@ export function getUpcomingPayments(fixedExpenses, date = new Date()) {
     .slice(0, 5);
 }
 
+function getMovementsExcludingAutomaticDuplicates(movements, fixedExpenses, start, end) {
+  const automaticExpenses = fixedExpenses.filter((expense) => expense.active && expense.automatic);
+
+  return movements.filter((movement) => {
+    if (movement.type !== 'Gasto') return true;
+
+    const movementDate = toDate(movement.date);
+    if (!isBetween(movementDate, start, end)) return true;
+
+    const movementAmount = Number(movement.amount || 0);
+    const comparableText = [movement.concept, movement.category, movement.notes]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase().trim())
+      .join(' ');
+
+    return !automaticExpenses.some((expense) => {
+      if (Number(expense.amount || 0) !== movementAmount) return false;
+      const expenseText = [expense.name].filter(Boolean).map((value) => String(value).toLowerCase().trim()).join(' ');
+      return expenseText && comparableText.includes(expenseText);
+    });
+  });
+}
+
 export function summarizeFinances(state, date = new Date()) {
   const { settings, fixedExpenses, movements, goals, investments } = state;
   const weekStart = startOfWeek(date);
@@ -145,10 +220,12 @@ export function summarizeFinances(state, date = new Date()) {
   const monthEnd = endOfMonth(date);
   const monthName = date.toLocaleDateString('es-MX', { month: 'long' });
 
-  const weekMovements = movements.filter((movement) => isBetween(movement.date, weekStart, weekEnd));
-  const monthMovements = movements.filter((movement) => isBetween(movement.date, monthStart, monthEnd));
+  const weekMovements = getMovementsExcludingAutomaticDuplicates(movements.filter((movement) => isBetween(movement.date, weekStart, weekEnd)), fixedExpenses, weekStart, weekEnd);
+  const monthMovements = getMovementsExcludingAutomaticDuplicates(movements.filter((movement) => isBetween(movement.date, monthStart, monthEnd)), fixedExpenses, monthStart, monthEnd);
   const weeklyExpenses = weekMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
-  const monthlyExpenses = monthMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
+  const monthlyManualExpenses = monthMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
+  const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
+  const monthlyExpenses = monthlyManualExpenses + monthlyAutomaticExpenses;
   const monthlyIncome = monthMovements.filter((movement) => movement.type === 'Ingreso').reduce((sum, movement) => sum + Number(movement.amount), 0);
   const automaticExpenses = getAutomaticFixedExpenses(fixedExpenses, date);
   const automaticWeekly = automaticExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
@@ -158,8 +235,10 @@ export function summarizeFinances(state, date = new Date()) {
   const investmentsWithReturns = getInvestmentReturns(investments);
   const dailyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.dailyReturn, 0);
   const monthlyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.monthlyReturn, 0);
-  const savingsThisMonth = Number(settings.weeklySalary || 0) * 4 + monthlyIncome + monthlyReturns - monthlyExpenses - automaticWeekly;
-  const netWorth = Number(settings.currentNetWorth || 0) + monthlyReturns;
+  const shouldAdjustNetWorthForSync = !settings.lastNetWorthSyncDate;
+  const netWorthBase = Number(settings.currentNetWorth || 0) - (shouldAdjustNetWorthForSync ? monthlyAutomaticExpenses : 0);
+  const savingsThisMonth = monthlyIncome + monthlyReturns - monthlyExpenses;
+  const netWorth = netWorthBase + monthlyReturns;
   const goalsProgress = goals.map((goal) => {
     const isCompleted = goal.status === 'terminada';
     return {
@@ -192,7 +271,7 @@ export function summarizeFinances(state, date = new Date()) {
       { name: 'Presupuesto', monto: weeklyBudget },
       { name: 'Gastado', monto: weeklyExpenses + automaticWeekly },
     ],
-    savingsTrend: getSavingsTrend(movements, settings),
+    savingsTrend: getSavingsTrend(movements, fixedExpenses, settings),
     status: getFinancialStatus(weeklyAvailable, remainingPercent, savingsThisMonth, settings.monthlySavingsGoal),
     trendInsights,
   };
@@ -221,8 +300,10 @@ function getTrendInsights(state, date) {
   const previousMonthExpenses = previousMonthMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
   const currentMonthIncome = currentMonthMovements.filter((movement) => movement.type === 'Ingreso').reduce((sum, movement) => sum + Number(movement.amount), 0);
   const previousMonthIncome = previousMonthMovements.filter((movement) => movement.type === 'Ingreso').reduce((sum, movement) => sum + Number(movement.amount), 0);
-  const currentMonthSavings = Number(settings.weeklySalary || 0) * 4 + currentMonthIncome - currentMonthExpenses - currentAutomaticExpenses;
-  const previousMonthSavings = Number(settings.weeklySalary || 0) * 4 + previousMonthIncome - previousMonthExpenses - previousAutomaticExpenses;
+  const currentMonthAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
+  const previousMonthAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, previousMonth.start);
+  const currentMonthSavings = currentMonthIncome - currentMonthExpenses - currentMonthAutomaticExpenses;
+  const previousMonthSavings = previousMonthIncome - previousMonthExpenses - previousMonthAutomaticExpenses;
 
   const insights = [];
   const addComparisonInsight = (message) => {
@@ -289,13 +370,13 @@ export function getCategoryData(movements) {
   return Object.entries(totals).map(([name, value]) => ({ name, value }));
 }
 
-function getSavingsTrend(movements, settings) {
-  const monthlyBase = Number(settings.weeklySalary || 0) * 4;
+function getSavingsTrend(movements, fixedExpenses, settings) {
   return Array.from({ length: 6 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() - (5 - index));
     const start = startOfMonth(date);
     const end = endOfMonth(date);
+    const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
     const expenses = movements
       .filter((movement) => movement.type === 'Gasto' && isBetween(movement.date, start, end))
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
@@ -304,7 +385,7 @@ function getSavingsTrend(movements, settings) {
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
     return {
       month: date.toLocaleDateString('es-MX', { month: 'short' }),
-      ahorro: monthlyBase + income - expenses,
+      ahorro: income - expenses - monthlyAutomaticExpenses,
     };
   });
 }
