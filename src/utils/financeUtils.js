@@ -12,6 +12,18 @@ export function getInvestmentReturns(investments) {
   });
 }
 
+export function getProratedInvestmentReturnsForMonth(investments, date = new Date(), referenceDate) {
+  const targetDate = toDate(date);
+  const reference = toDate(referenceDate || date);
+  const investmentReturns = getInvestmentReturns(investments);
+  const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
+  const daysElapsed = targetDate.getFullYear() === reference.getFullYear() && targetDate.getMonth() === reference.getMonth()
+    ? reference.getDate()
+    : daysInMonth;
+
+  return investmentReturns.reduce((sum, investment) => sum + investment.monthlyReturn * (daysElapsed / daysInMonth), 0);
+}
+
 export function getAutomaticFixedExpenses(fixedExpenses, date = new Date()) {
   const weekStart = startOfWeek(date);
   const weekEnd = endOfWeek(date);
@@ -234,7 +246,7 @@ export function summarizeFinances(state, date = new Date()) {
   const remainingPercent = weeklyBudget ? (weeklyAvailable / weeklyBudget) * 100 : 0;
   const investmentsWithReturns = getInvestmentReturns(investments);
   const dailyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.dailyReturn, 0);
-  const monthlyReturns = investmentsWithReturns.reduce((sum, investment) => sum + investment.monthlyReturn, 0);
+  const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, date, date);
   const shouldAdjustNetWorthForSync = !settings.lastNetWorthSyncDate;
   const netWorthBase = Number(settings.currentNetWorth || 0) - (shouldAdjustNetWorthForSync ? monthlyAutomaticExpenses : 0);
   const savingsThisMonth = monthlyIncome + monthlyReturns - monthlyExpenses;
@@ -271,14 +283,14 @@ export function summarizeFinances(state, date = new Date()) {
       { name: 'Presupuesto', monto: weeklyBudget },
       { name: 'Gastado', monto: weeklyExpenses + automaticWeekly },
     ],
-    savingsTrend: getSavingsTrend(movements, fixedExpenses, settings),
+    savingsTrend: getSavingsTrend(movements, fixedExpenses, investments, date),
     status: getFinancialStatus(weeklyAvailable, remainingPercent, savingsThisMonth, settings.monthlySavingsGoal),
     trendInsights,
   };
 }
 
 function getTrendInsights(state, date) {
-  const { settings, fixedExpenses, movements } = state;
+  const { settings, fixedExpenses, movements, investments } = state;
   const currentWeek = { start: startOfWeek(date), end: endOfWeek(date) };
   const previousWeekDate = new Date(date);
   previousWeekDate.setDate(previousWeekDate.getDate() - 7);
@@ -302,8 +314,10 @@ function getTrendInsights(state, date) {
   const previousMonthIncome = previousMonthMovements.filter((movement) => movement.type === 'Ingreso').reduce((sum, movement) => sum + Number(movement.amount), 0);
   const currentMonthAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
   const previousMonthAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, previousMonth.start);
-  const currentMonthSavings = currentMonthIncome - currentMonthExpenses - currentMonthAutomaticExpenses;
-  const previousMonthSavings = previousMonthIncome - previousMonthExpenses - previousMonthAutomaticExpenses;
+  const currentMonthReturns = getProratedInvestmentReturnsForMonth(investments, date, date);
+  const previousMonthReturns = getProratedInvestmentReturnsForMonth(investments, previousMonth.start, endOfMonth(previousMonth.start));
+  const currentMonthSavings = currentMonthIncome - currentMonthExpenses - currentMonthAutomaticExpenses + currentMonthReturns;
+  const previousMonthSavings = previousMonthIncome - previousMonthExpenses - previousMonthAutomaticExpenses + previousMonthReturns;
 
   const insights = [];
   const addComparisonInsight = (message) => {
@@ -370,15 +384,16 @@ export function getCategoryData(movements) {
   return Object.entries(totals).map(([name, value]) => ({ name, value }));
 }
 
-function getSavingsTrend(movements, fixedExpenses, settings) {
+function getSavingsTrend(movements, fixedExpenses, investments, selectedDate) {
+  const currentReference = toDate(selectedDate || new Date());
   const firstMovementDate = movements
     .map((movement) => new Date(movement.date))
     .filter((date) => !Number.isNaN(date.getTime()))
     .sort((a, b) => a - b)[0];
 
   return Array.from({ length: 6 }, (_, index) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - (5 - index));
+    const date = new Date(currentReference);
+    date.setMonth(currentReference.getMonth() - (5 - index));
     const start = startOfMonth(date);
     const end = endOfMonth(date);
     const monthLabel = date.toLocaleDateString('es-MX', { month: 'short' });
@@ -391,16 +406,26 @@ function getSavingsTrend(movements, fixedExpenses, settings) {
     }
 
     const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
-    const expenses = movements
-      .filter((movement) => movement.type === 'Gasto' && isBetween(movement.date, start, end))
+    const monthMovements = getMovementsExcludingAutomaticDuplicates(
+      movements.filter((movement) => isBetween(movement.date, start, end)),
+      fixedExpenses,
+      start,
+      end,
+    );
+    const expenses = monthMovements
+      .filter((movement) => movement.type === 'Gasto')
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
-    const income = movements
-      .filter((movement) => movement.type === 'Ingreso' && isBetween(movement.date, start, end))
+    const income = monthMovements
+      .filter((movement) => movement.type === 'Ingreso')
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
+    const referenceDate = date.getMonth() === currentReference.getMonth() && date.getFullYear() === currentReference.getFullYear()
+      ? currentReference
+      : endOfMonth(date);
+    const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, date, referenceDate);
 
     return {
       month: monthLabel,
-      ahorro: income - expenses - monthlyAutomaticExpenses,
+      ahorro: income - expenses - monthlyAutomaticExpenses + monthlyReturns,
     };
   });
 }

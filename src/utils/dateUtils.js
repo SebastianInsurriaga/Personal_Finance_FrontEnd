@@ -1,5 +1,21 @@
 export function toDate(dateValue = new Date()) {
-  const date = dateValue instanceof Date ? dateValue : new Date(`${dateValue}T00:00:00`);
+  let date;
+  if (dateValue instanceof Date) {
+    const isDateOnlyUtc =
+      dateValue.getUTCHours() === 0 &&
+      dateValue.getUTCMinutes() === 0 &&
+      dateValue.getUTCSeconds() === 0 &&
+      dateValue.getUTCMilliseconds() === 0 &&
+      (dateValue.getHours() !== 0 || dateValue.getMinutes() !== 0 || dateValue.getSeconds() !== 0);
+
+    if (isDateOnlyUtc) {
+      date = new Date(dateValue.getUTCFullYear(), dateValue.getUTCMonth(), dateValue.getUTCDate());
+    } else {
+      date = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate());
+    }
+  } else {
+    date = new Date(`${dateValue}T00:00:00`);
+  }
   return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 

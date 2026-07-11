@@ -83,3 +83,50 @@ test('keeps currentNetWorth when config already synced with automatic fixed expe
 
   assert.equal(summary.netWorth, 9484);
 });
+
+test('prorates investment returns for the current month only', () => {
+  const state = {
+    settings: { weeklyBudget: 5000, monthlySavingsGoal: 8000, currentNetWorth: 0 },
+    fixedExpenses: [],
+    movements: [
+      { id: 'income', type: 'Ingreso', amount: 1000, date: '2026-07-11', concept: 'Nomina', category: 'Nomina' },
+    ],
+    goals: [],
+    investments: [
+      { id: 'inv-1', name: 'Test', capital: 36500, annualRate: 12 },
+    ],
+  };
+
+  const summary = summarizeFinances(state, new Date('2026-07-11'));
+  const expectedMonthlyReturn = (36500 * 0.12 / 12) * (11 / 31);
+
+  assert.equal(Math.round(summary.savingsThisMonth), Math.round(1000 + expectedMonthlyReturn));
+});
+
+test('last savings trend point matches savingsThisMonth for the selected month', () => {
+  const state = {
+    settings: { weeklyBudget: 10000, monthlySavingsGoal: 12400, currentNetWorth: 100000 },
+    fixedExpenses: [
+      { id: 'seguro', name: 'Seguro', active: true, automatic: true, type: 'Mensual', amount: 116, dayOfMonth: 1 },
+      { id: 'gasolina', name: 'Gasolina', active: true, automatic: true, type: 'Semanal', amount: 400 },
+    ],
+    movements: [
+      { id: 'income', type: 'Ingreso', amount: 4458, date: '2026-07-11', concept: 'Nomina', category: 'Nomina' },
+      { id: 'gas', type: 'Gasto', amount: 400, date: '2026-07-11', concept: 'Gasolina', category: 'Transporte' },
+      { id: 'dlc', type: 'Gasto', amount: 409, date: '2026-07-11', concept: 'DLC', category: 'Entretenimiento' },
+    ],
+    goals: [],
+    investments: [
+      { id: 'inv-1', name: 'PLATA', capital: 36286, annualRate: 10 },
+      { id: 'inv-2', name: 'Mercado Pago', capital: 25000, annualRate: 12 },
+      { id: 'inv-3', name: 'NU', capital: 25000, annualRate: 13 },
+    ],
+  };
+
+  const date = new Date('2026-07-11');
+  const summary = summarizeFinances(state, date);
+  const trend = summary.savingsTrend;
+  const lastPoint = trend[trend.length - 1];
+
+  assert.equal(Math.round(lastPoint.ahorro), Math.round(summary.savingsThisMonth));
+});
