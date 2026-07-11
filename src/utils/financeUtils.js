@@ -371,11 +371,25 @@ export function getCategoryData(movements) {
 }
 
 function getSavingsTrend(movements, fixedExpenses, settings) {
+  const firstMovementDate = movements
+    .map((movement) => new Date(movement.date))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => a - b)[0];
+
   return Array.from({ length: 6 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() - (5 - index));
     const start = startOfMonth(date);
     const end = endOfMonth(date);
+    const monthLabel = date.toLocaleDateString('es-MX', { month: 'short' });
+
+    if (firstMovementDate && end < startOfMonth(firstMovementDate)) {
+      return {
+        month: monthLabel,
+        ahorro: 0,
+      };
+    }
+
     const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
     const expenses = movements
       .filter((movement) => movement.type === 'Gasto' && isBetween(movement.date, start, end))
@@ -383,8 +397,9 @@ function getSavingsTrend(movements, fixedExpenses, settings) {
     const income = movements
       .filter((movement) => movement.type === 'Ingreso' && isBetween(movement.date, start, end))
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
+
     return {
-      month: date.toLocaleDateString('es-MX', { month: 'short' }),
+      month: monthLabel,
       ahorro: income - expenses - monthlyAutomaticExpenses,
     };
   });

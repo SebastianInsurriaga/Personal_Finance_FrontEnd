@@ -1,6 +1,7 @@
 export const categories = [
   'Transporte',
   'Comida',
+  'Nomina',
   'Suscripciones',
   'Entretenimiento',
   'Compras',
