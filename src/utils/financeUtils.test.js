@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getMonthlyAutomaticFixedExpenses, summarizeFinances } from './financeUtils.js';
+import { getMonthlyAutomaticFixedExpenses, removeExpiredFixedExpenses, summarizeFinances } from './financeUtils.js';
 
 test('counts weekly automatic expenses by the weeks that have actually occurred in the month up to the selected date', () => {
   const fixedExpenses = [
@@ -26,6 +26,33 @@ test('does not count monthly fixed expenses before their due day', () => {
   const result = getMonthlyAutomaticFixedExpenses(fixedExpenses, new Date('2026-07-11'));
 
   assert.equal(result, 0);
+});
+
+test('counts a temporary monthly expense only during its configured months', () => {
+  const fixedExpenses = [
+    { id: 'temporary-monthly', active: true, automatic: true, type: 'Mensual', amount: 75, dayOfMonth: 1, startDate: '2026-07-01', expiresAt: '2026-10-01' },
+  ];
+
+  assert.equal(getMonthlyAutomaticFixedExpenses(fixedExpenses, new Date('2026-09-15')), 75);
+  assert.equal(getMonthlyAutomaticFixedExpenses(fixedExpenses, new Date('2026-10-15')), 0);
+});
+
+test('counts temporary weekly expenses from their start date for the configured weeks', () => {
+  const fixedExpenses = [
+    { id: 'temporary-weekly', active: true, automatic: true, type: 'Semanal', amount: 400, startDate: '2026-07-06', expiresAt: '2026-08-03' },
+  ];
+
+  assert.equal(getMonthlyAutomaticFixedExpenses(fixedExpenses, new Date('2026-07-31')), 400 * 4);
+  assert.equal(getMonthlyAutomaticFixedExpenses(fixedExpenses, new Date('2026-08-10')), 0);
+});
+
+test('removes temporary fixed expenses when their expiration date arrives', () => {
+  const fixedExpenses = [
+    { id: 'active', active: true, type: 'Mensual', expiresAt: '2026-08-23' },
+    { id: 'expired', active: true, type: 'Semanal', expiresAt: '2026-08-21' },
+  ];
+
+  assert.deepEqual(removeExpiredFixedExpenses(fixedExpenses, new Date('2026-08-22')).map(({ id }) => id), ['active']);
 });
 
 test('includes monthly automatic fixed expenses in monthly expense totals and savings', () => {

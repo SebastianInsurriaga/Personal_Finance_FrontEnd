@@ -35,7 +35,7 @@ import { generateAnnualFinancialReport } from '../services/annualPdfReportServic
 
 const emptyGoal = { name: '', targetAmount: '', currentAmount: '', color: goalColors[0], status: 'activa' };
 const emptyInvestment = { name: '', capital: '', annualRate: '' };
-const emptyExpense = { name: '', type: 'Semanal', amount: '', dayOfMonth: '', dueDate: '', automatic: true, active: true };
+const emptyExpense = { name: '', type: 'Semanal', amount: '', dayOfMonth: '', dueDate: '', startDate: '', duration: '', temporary: false, automatic: true, active: true };
 
 export default function Settings() {
   const { state, dispatch } = useFinance();
@@ -99,7 +99,12 @@ export default function Settings() {
       showAlert('Selecciona una fecha de vencimiento para el gasto único.', 'error');
       return;
     }
-    dispatch({ type: 'ADD_FIXED_EXPENSE', payload: normalizeNumbers(expense) });
+    const temporalExpense = getTemporalExpense(expense);
+    if (temporalExpense.error) {
+      showAlert(temporalExpense.error, 'error');
+      return;
+    }
+    dispatch({ type: 'ADD_FIXED_EXPENSE', payload: normalizeNumbers(temporalExpense) });
     setExpense({ ...emptyExpense });
     showAlert('Gasto fijo agregado con éxito', 'success');
   };
@@ -144,7 +149,7 @@ export default function Settings() {
 
   const openExpenseEditor = (item) => {
     setEditingExpense(item);
-    setExpenseEditForm({ ...item });
+    setExpenseEditForm({ ...item, temporary: item.type === 'Única' ? false : item.temporary });
     setExpenseDialogOpen(true);
   };
 
@@ -160,7 +165,12 @@ export default function Settings() {
       showAlert('Selecciona una fecha de vencimiento para el gasto único.', 'error');
       return;
     }
-    dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...normalizeNumbers(expenseEditForm), id: editingExpense.id } });
+    const temporalExpense = getTemporalExpense(expenseEditForm);
+    if (temporalExpense.error) {
+      showAlert(temporalExpense.error, 'error');
+      return;
+    }
+    dispatch({ type: 'UPDATE_FIXED_EXPENSE', payload: { ...normalizeNumbers(temporalExpense), id: editingExpense.id } });
     showAlert('Gasto fijo actualizado con éxito', 'success');
     closeExpenseEditor();
   };
@@ -176,7 +186,7 @@ export default function Settings() {
         return;
       }
 
-      const response = await fetch('/.netlify/functions/send-email', {
+      const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -385,23 +395,27 @@ export default function Settings() {
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Gastos fijos</Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr auto auto' }, gap: 2, mb: 3, alignItems: 'center' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr 1fr auto auto' }, gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField label="Nombre" value={expense.name} onChange={(event) => setExpense({ ...expense, name: event.target.value })} />
-            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expense.type} onChange={(event) => setExpense({ ...expense, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
+            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expense.type} onChange={(event) => setExpense({ ...expense, type: event.target.value, temporary: event.target.value === 'Única' ? false : expense.temporary })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
             <MoneyField label="Monto" value={expense.amount} onChange={(amount) => setExpense({ ...expense, amount })} />
             <TextField type="number" label="Día del mes" disabled={expense.type === 'Semanal' || expense.type === 'Única'} value={expense.dayOfMonth} onChange={(event) => setExpense({ ...expense, dayOfMonth: event.target.value })} />
             <TextField type="date" label="Fecha de vencimiento" disabled={expense.type !== 'Única'} value={expense.dueDate || ''} onChange={(event) => setExpense({ ...expense, dueDate: event.target.value })} InputLabelProps={{ shrink: true }} />
+            <ToggleLabel label="Temporal" disabled={expense.type === 'Única'} checked={expense.temporary} onChange={(temporary) => setExpense({ ...expense, temporary, startDate: temporary ? (expense.startDate || todayKey()) : '', duration: temporary ? expense.duration : '', expiresAt: temporary ? expense.expiresAt : '' })} />
+            {expense.temporary ? <TextField type="date" label="Inicia" value={expense.startDate} onChange={(event) => setExpense({ ...expense, startDate: event.target.value })} InputLabelProps={{ shrink: true }} /> : null}
+            {expense.temporary ? <TextField type="number" label={`Duración (${expense.type === 'Mensual' ? 'meses' : 'semanas'})`} value={expense.duration} onChange={(event) => setExpense({ ...expense, duration: event.target.value })} inputProps={{ min: 1, step: 1 }} /> : null}
             <ToggleLabel label="Automático" checked={expense.automatic} onChange={(automatic) => setExpense({ ...expense, automatic })} />
             <ToggleLabel label="Activo" checked={expense.active} onChange={(active) => setExpense({ ...expense, active })} />
             <Button variant="contained" startIcon={<AddIcon />} onClick={addExpense}>Agregar</Button>
           </Box>
           <Stack spacing={1.5}>
             {state.fixedExpenses.map((item) => (
-              <Box key={item.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr repeat(6, auto)' }, gap: 2, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+              <Box key={item.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(220px, 1fr) repeat(6, max-content) max-content' }, gap: 2, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'action.hover', overflowX: 'auto' }}>
                 <Typography fontWeight={700}>{item.name}</Typography>
                 <Chip label={item.type} />
                 <Chip label={formatCurrency(item.amount)} />
                 <Chip label={item.type === 'Mensual' ? `Día ${item.dayOfMonth || '-'}` : item.type === 'Única' ? `Vence ${item.dueDate || '-'}` : 'Cada semana'} color="info" />
+                {item.expiresAt ? <Chip label={`Temporal hasta ${item.expiresAt}`} color="warning" /> : null}
                 <Chip label={item.automatic ? 'Automático' : 'Manual'} color={item.automatic ? 'primary' : 'default'} />
                 <Chip label={item.active ? 'Activo' : 'Inactivo'} color={item.active ? 'success' : 'default'} />
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -452,12 +466,15 @@ export default function Settings() {
       <Dialog open={expenseDialogOpen} onClose={closeExpenseEditor} maxWidth="md" fullWidth>
         <DialogTitle>Editar gasto fijo</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr auto' }, gap: 2, mt: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr 1fr 1fr 1fr auto' }, gap: 2, mt: 1, alignItems: 'center' }}>
             <TextField label="Nombre" value={expenseEditForm.name} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, name: event.target.value })} />
-            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expenseEditForm.type} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, type: event.target.value })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
+            <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={expenseEditForm.type} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, type: event.target.value, temporary: event.target.value === 'Única' ? false : expenseEditForm.temporary })}><MenuItem value="Semanal">Semanal</MenuItem><MenuItem value="Mensual">Mensual</MenuItem><MenuItem value="Única">Única</MenuItem></Select></FormControl>
             <MoneyField label="Monto" value={expenseEditForm.amount} onChange={(amount) => setExpenseEditForm({ ...expenseEditForm, amount })} />
             <TextField type="number" label="Día del mes" disabled={expenseEditForm.type === 'Semanal' || expenseEditForm.type === 'Única'} value={expenseEditForm.dayOfMonth} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, dayOfMonth: event.target.value })} />
             <TextField type="date" label="Fecha de vencimiento" disabled={expenseEditForm.type !== 'Única'} value={expenseEditForm.dueDate || ''} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, dueDate: event.target.value })} InputLabelProps={{ shrink: true }} />
+            <ToggleLabel label="Temporal" disabled={expenseEditForm.type === 'Única'} checked={expenseEditForm.temporary} onChange={(temporary) => setExpenseEditForm({ ...expenseEditForm, temporary, startDate: temporary ? (expenseEditForm.startDate || todayKey()) : '', duration: temporary ? expenseEditForm.duration : '', expiresAt: temporary ? expenseEditForm.expiresAt : '' })} />
+            {expenseEditForm.temporary ? <TextField type="date" label="Inicia" value={expenseEditForm.startDate || ''} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, startDate: event.target.value })} InputLabelProps={{ shrink: true }} /> : null}
+            {expenseEditForm.temporary ? <TextField type="number" label={`Duración (${expenseEditForm.type === 'Mensual' ? 'meses' : 'semanas'})`} value={expenseEditForm.duration || ''} onChange={(event) => setExpenseEditForm({ ...expenseEditForm, duration: event.target.value })} inputProps={{ min: 1, step: 1 }} /> : null}
             <ToggleLabel label="Automático" checked={expenseEditForm.automatic} onChange={(automatic) => setExpenseEditForm({ ...expenseEditForm, automatic })} />
             <ToggleLabel label="Activo" checked={expenseEditForm.active} onChange={(active) => setExpenseEditForm({ ...expenseEditForm, active })} />
           </Box>
@@ -481,10 +498,10 @@ function MoneyField({ label, value, onChange }) {
   return <TextField type="number" label={label} value={value} onChange={(event) => onChange(event.target.value)} />;
 }
 
-function ToggleLabel({ label, checked, onChange }) {
+function ToggleLabel({ label, checked, onChange, disabled = false }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Switch checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <Switch checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
       <Typography variant="body2">{label}</Typography>
     </Box>
   );
@@ -510,10 +527,45 @@ function EditableList({ items, fields, deleteType, onDeleteSuccess, onEdit }) {
   );
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getTemporalExpense(expense) {
+  if (!expense.temporary) {
+    return Object.fromEntries(Object.entries(expense).filter(([key]) => !['startDate', 'duration', 'expiresAt', 'temporary'].includes(key)));
+  }
+
+  if (expense.type === 'Única') return { error: 'Los gastos únicos no pueden ser temporales.' };
+  if (!expense.startDate) return { error: 'Selecciona la fecha de inicio del gasto temporal.' };
+
+  const duration = Number(expense.duration);
+  if (!Number.isInteger(duration) || duration < 1) return { error: 'La duración debe ser un número entero mayor que cero.' };
+
+  const startDate = new Date(`${expense.startDate}T00:00:00`);
+  const expiresAt = new Date(startDate);
+  if (expense.type === 'Mensual') {
+    const day = startDate.getDate();
+    expiresAt.setDate(1);
+    expiresAt.setMonth(expiresAt.getMonth() + duration);
+    const lastDay = new Date(expiresAt.getFullYear(), expiresAt.getMonth() + 1, 0).getDate();
+    expiresAt.setDate(Math.min(day, lastDay));
+  } else {
+    expiresAt.setDate(expiresAt.getDate() + duration * 7);
+  }
+
+  return {
+    ...expense,
+    startDate: expense.startDate,
+    duration,
+    expiresAt: expiresAt.toISOString().slice(0, 10),
+  };
+}
+
 function normalizeNumbers(record) {
   return Object.fromEntries(
     Object.entries(record).map(([key, value]) => {
-      if (['weeklySalary', 'weeklyBudget', 'monthlySavingsGoal', 'currentNetWorth', 'targetAmount', 'currentAmount', 'capital', 'annualRate', 'amount', 'dayOfMonth'].includes(key)) {
+      if (['weeklySalary', 'weeklyBudget', 'monthlySavingsGoal', 'currentNetWorth', 'targetAmount', 'currentAmount', 'capital', 'annualRate', 'amount', 'dayOfMonth', 'duration'].includes(key)) {
         return [key, value === '' ? '' : Number(value)];
       }
       return [key, value];

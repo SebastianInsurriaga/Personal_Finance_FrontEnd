@@ -30,7 +30,7 @@ export function getAutomaticFixedExpenses(fixedExpenses, date = new Date()) {
   const currentDate = toDate(date);
 
   return fixedExpenses.filter((expense) => {
-    if (!expense.active || !expense.automatic) return false;
+    if (!isFixedExpenseActiveOnDate(expense, currentDate) || !expense.automatic) return false;
     if (expense.type === 'Semanal') return true;
 
     if (expense.type === 'Única') {
@@ -50,10 +50,20 @@ export function removeExpiredFixedExpenses(fixedExpenses, date = new Date()) {
   const today = new Date(toDate(date).getFullYear(), toDate(date).getMonth(), toDate(date).getDate());
 
   return fixedExpenses.filter((expense) => {
+    if (expense.expiresAt) return today < toDate(expense.expiresAt);
     if (expense.type !== 'Única' || !expense.dueDate) return true;
     const dueDate = toDate(expense.dueDate);
     return dueDate >= today;
   });
+}
+
+export function isFixedExpenseActiveOnDate(expense, date = new Date()) {
+  if (!expense.active) return false;
+
+  const currentDate = toDate(date);
+  if (expense.startDate && currentDate < toDate(expense.startDate)) return false;
+  if (expense.expiresAt && currentDate >= toDate(expense.expiresAt)) return false;
+  return true;
 }
 
 export function getMonthlyAutomaticFixedExpenses(fixedExpenses, date = new Date()) {
@@ -64,10 +74,24 @@ export function getMonthlyAutomaticFixedExpenses(fixedExpenses, date = new Date(
   const selectedDate = toDate(date);
 
   return fixedExpenses.reduce((sum, expense) => {
-    if (!expense.active || !expense.automatic) return sum;
+    if (!isFixedExpenseActiveOnDate(expense, selectedDate) || !expense.automatic) return sum;
     const amount = Number(expense.amount || 0);
 
     if (expense.type === 'Semanal') {
+      if (expense.startDate && expense.expiresAt) {
+        const startDate = toDate(expense.startDate);
+        const expiryDate = toDate(expense.expiresAt);
+        let paymentDate = new Date(startDate);
+        let weeklyCount = 0;
+
+        while (paymentDate <= selectedDate && paymentDate < expiryDate) {
+          if (paymentDate >= monthStart && paymentDate <= monthEnd) weeklyCount += 1;
+          paymentDate.setDate(paymentDate.getDate() + 7);
+        }
+
+        return sum + amount * weeklyCount;
+      }
+
       let weekStart = new Date(monthStart);
       const dayOfWeek = weekStart.getDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -154,17 +178,17 @@ function getExpensePaymentMeta(expense, date = new Date(), todayOverride) {
 
 export function getFixedExpensesCalendar(fixedExpenses, date = new Date()) {
   const monthStart = startOfMonth(date);
+  const monthEnd = endOfMonth(date);
   const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const firstDayIndex = monthStart.getDay();
   const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
 
   const eventsByDate = fixedExpenses.reduce((acc, expense) => {
-    if (!expense.active) return acc;
-
     const eventDate = expense.type === 'Única' && expense.dueDate
       ? toDate(expense.dueDate)
       : new Date(date.getFullYear(), date.getMonth(), Number(expense.dayOfMonth || 1));
 
+    if (!isFixedExpenseActiveOnDate(expense, eventDate)) return acc;
     if (expense.type === 'Mensual' && (!expense.dayOfMonth || eventDate.getMonth() !== date.getMonth() || eventDate.getFullYear() !== date.getFullYear())) return acc;
     if (expense.type === 'Única' && (!expense.dueDate || eventDate.getMonth() !== date.getMonth() || eventDate.getFullYear() !== date.getFullYear())) return acc;
     if (expense.type === 'Semanal') return acc;
@@ -195,7 +219,12 @@ export function getFixedExpensesCalendar(fixedExpenses, date = new Date()) {
   return {
     monthName: date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }),
     days,
-    weeklyExpenses: fixedExpenses.filter((expense) => expense.active && expense.type === 'Semanal'),
+    weeklyExpenses: fixedExpenses.filter((expense) => {
+      if (expense.type !== 'Semanal' || !expense.active) return false;
+      const startsBeforeMonthEnds = !expense.startDate || toDate(expense.startDate) <= monthEnd;
+      const endsAfterMonthStarts = !expense.expiresAt || toDate(expense.expiresAt) > monthStart;
+      return startsBeforeMonthEnds && endsAfterMonthStarts;
+    }),
   };
 }
 
@@ -203,7 +232,7 @@ export function getUpcomingPayments(fixedExpenses, date = new Date()) {
   const statusPriority = { vencido: 0, proximo: 1, normal: 2 };
 
   return fixedExpenses
-    .filter((expense) => expense.active)
+    .filter((expense) => isFixedExpenseActiveOnDate(expense, date))
     .map((expense) => ({
       ...expense,
       ...getExpensePaymentMeta(expense, date),
@@ -230,6 +259,7 @@ function getMovementsExcludingAutomaticDuplicates(movements, fixedExpenses, star
       .join(' ');
 
     return !automaticExpenses.some((expense) => {
+      if (!isFixedExpenseActiveOnDate(expense, movementDate)) return false;
       if (Number(expense.amount || 0) !== movementAmount) return false;
       const expenseText = [expense.name].filter(Boolean).map((value) => String(value).toLowerCase().trim()).join(' ');
       return expenseText && comparableText.includes(expenseText);
@@ -350,7 +380,7 @@ export function summarizeFinances(state, date = new Date()) {
 }
 
 function getTrendInsights(state, date) {
-  const { settings, fixedExpenses, movements, investments } = state;
+  const { fixedExpenses, movements, investments } = state;
   const currentWeek = { start: startOfWeek(date), end: endOfWeek(date) };
   const previousWeekDate = new Date(date);
   previousWeekDate.setDate(previousWeekDate.getDate() - 7);
