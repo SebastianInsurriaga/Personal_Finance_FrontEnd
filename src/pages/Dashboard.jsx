@@ -6,6 +6,7 @@ import { SavingsIcon, TrendIcon, WalletIcon } from '../components/AppIcons.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { useFinanceSummary } from '../hooks/useFinanceSummary.js';
+import { useFinance } from '../context/FinanceContext.jsx';
 import { formatCurrency } from '../utils/formatters.js';
 
 function budgetColor(percent, available) {
@@ -17,6 +18,7 @@ function budgetColor(percent, available) {
 
 export default function Dashboard() {
   const summary = useFinanceSummary();
+  const { state } = useFinance();
   const color = budgetColor(summary.remainingPercent, summary.weeklyAvailable);
 
   return (
@@ -76,7 +78,12 @@ export default function Dashboard() {
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Calendario de pagos</Typography>
-          <FixedExpensesCalendar days={summary.fixedExpensesCalendar.days} monthName={summary.fixedExpensesCalendar.monthName} weeklyExpenses={summary.fixedExpensesCalendar.weeklyExpenses} />
+          <FixedExpensesCalendar
+            days={summary.fixedExpensesCalendar.days}
+            monthName={summary.fixedExpensesCalendar.monthName}
+            weeklyExpenses={summary.fixedExpensesCalendar.weeklyExpenses}
+            fixedExpenses={state.fixedExpenses}
+          />
         </CardContent>
       </Card>
 
@@ -102,7 +109,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      <FinancialCharts categoryData={summary.categoryData} weeklyBars={summary.weeklyBars} savingsTrend={summary.savingsTrend} />
+      <FinancialCharts categoryData={summary.categoryData} weeklyBars={summary.weeklyBars} savingsTrend={summary.savingsTrend} categoryTrends={summary.categoryTrends} />
     </Stack>
   );
 }

@@ -1,4 +1,6 @@
-import { Box, Chip, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography, IconButton } from '@mui/material';
+import { useMemo, useState } from 'react';
+import { getFixedExpensesCalendar } from '../utils/financeUtils.js';
 
 const weekdayLabels = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
@@ -26,11 +28,52 @@ function getCellTone(events) {
   };
 }
 
-export default function FixedExpensesCalendar({ days, monthName, weeklyExpenses = [] }) {
+export default function FixedExpensesCalendar({ days, monthName, weeklyExpenses = [], fixedExpenses }) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const [displayDate, setDisplayDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  const computed = useMemo(() => {
+    if (Array.isArray(fixedExpenses) && fixedExpenses.length) {
+      return getFixedExpensesCalendar(fixedExpenses, displayDate);
+    }
+    return {
+      days: days || [],
+      monthName: monthName || '',
+      weeklyExpenses: weeklyExpenses || [],
+    };
+  }, [fixedExpenses, displayDate, days, monthName, weeklyExpenses]);
+
+  const handlePrev = () => {
+    const m = displayDate.getMonth();
+    const y = displayDate.getFullYear();
+    if (y === currentYear && m === 0) return;
+    const newDate = new Date(y, Math.max(0, m - 1), 1);
+    if (newDate.getFullYear() === currentYear) setDisplayDate(newDate);
+  };
+
+  const handleNext = () => {
+    const m = displayDate.getMonth();
+    const y = displayDate.getFullYear();
+    if (y === currentYear && m === 11) return;
+    const newDate = new Date(y, Math.min(11, m + 1), 1);
+    if (newDate.getFullYear() === currentYear) setDisplayDate(newDate);
+  };
+
   return (
     <Box sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', boxShadow: '0 16px 40px rgba(15, 23, 42, 0.08)' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="body2" color="text.secondary">{monthName}</Typography>
+        {fixedExpenses ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton size="small" onClick={handlePrev} aria-label="Anterior" title="Mes anterior">
+              <Typography component="span" variant="body2">‹</Typography>
+            </IconButton>
+            <IconButton size="small" onClick={handleNext} aria-label="Siguiente" title="Mes siguiente">
+              <Typography component="span" variant="body2">›</Typography>
+            </IconButton>
+          </Box>
+        ) : <Box />}
+        <Typography variant="body2" color="text.secondary">{computed.monthName}</Typography>
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 1, mb: 1 }}>
@@ -42,7 +85,7 @@ export default function FixedExpensesCalendar({ days, monthName, weeklyExpenses 
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 1 }}>
-        {days.map((cell) => {
+        {computed.days.map((cell) => {
           const tone = getCellTone(cell.events);
           return (
           <Box

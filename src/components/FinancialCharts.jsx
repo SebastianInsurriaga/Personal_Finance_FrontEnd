@@ -1,5 +1,5 @@
 import { Box, Card, CardContent, Typography, useTheme } from '@mui/material';
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap, XAxis, YAxis } from 'recharts';
 import EmptyState from './EmptyState.jsx';
 
 function ChartCard({ title, children }) {
@@ -13,7 +13,7 @@ function ChartCard({ title, children }) {
   );
 }
 
-export default function FinancialCharts({ categoryData, weeklyBars, savingsTrend }) {
+export default function FinancialCharts({ categoryData, weeklyBars, savingsTrend, categoryTrends }) {
   const theme = useTheme();
   const axisColor = theme.palette.text.secondary;
   const chartColors = [
@@ -60,18 +60,20 @@ export default function FinancialCharts({ categoryData, weeklyBars, savingsTrend
           </LineChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="Comparación por categoría">
-        {categoryData.length ? (
+      <ChartCard title="Tendencia por categoría (top 3)">
+        {categoryTrends && categoryTrends.series && categoryTrends.series.length ? (
           <ResponsiveContainer>
-            <BarChart data={categoryData}>
+            <LineChart data={categoryTrends.series} margin={{ right: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-              <XAxis dataKey="name" stroke={axisColor} />
+              <XAxis dataKey="month" stroke={axisColor} />
               <YAxis stroke={axisColor} />
               <Tooltip formatter={(value) => `$${Number(value).toLocaleString('es-MX')}`} />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} fill={theme.palette.warning.main} />
-            </BarChart>
+              {categoryTrends.topCategories.map((cat, idx) => (
+                <Line key={cat} type="monotone" dataKey={cat} stroke={chartColors[idx % chartColors.length]} strokeWidth={2} dot={{ r: 3 }} />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
-        ) : <EmptyState description="No hay gastos del mes actual." />}
+        ) : <EmptyState description="No hay suficientes datos históricos para mostrar tendencias de categorías." />}
       </ChartCard>
     </Box>
   );
