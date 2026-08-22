@@ -18,6 +18,8 @@ const createEmptyMovement = () => ({
 
 export default function Movements() {
   const { state, dispatch } = useFinance();
+  const todayMonth = new Date().toISOString().slice(0, 7);
+  const [filterMonth, setFilterMonth] = useState(todayMonth);
   const [movement, setMovement] = useState(createEmptyMovement());
   const [editMovement, setEditMovement] = useState(createEmptyMovement());
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -87,12 +89,23 @@ export default function Movements() {
 
       <Card>
         <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Historial</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Historial</Typography>
+            <TextField
+              type="month"
+              label="Mes"
+              InputLabelProps={{ shrink: true }}
+              size="small"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </Box>
           {state.movements.length ? (
             <Stack spacing={1.5}>
               {state.movements
                 .slice()
                 .sort((a, b) => b.date.localeCompare(a.date))
+                .filter((m) => (filterMonth ? m.date.slice(0, 7) === filterMonth : true))
                 .map((item) => (
                   <Box key={item.id} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.8fr 1.4fr 1fr 1fr auto' }, gap: 2, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
                     <Typography color="text.secondary">{item.date}</Typography>

@@ -108,11 +108,16 @@ export function getMonthlyAutomaticFixedExpenses(fixedExpenses, date = new Date(
   }, 0);
 }
 
-function getExpensePaymentMeta(expense, date = new Date()) {
+function getExpensePaymentMeta(expense, date = new Date(), todayOverride) {
+  // date: reference date used for calculating month/day placement
+  // todayOverride: optional Date used to determine if an expense is overdue (should be actual today)
+  const todayRef = todayOverride || new Date();
+
   if (expense.type === 'Semanal') {
     const daysUntil = 7 - (date.getDay() || 7);
     return {
       daysUntil: Math.max(0, daysUntil),
+      overdueDays: 0,
       status: daysUntil <= 3 ? 'proximo' : 'normal',
       label: `${expense.type === 'Semanal' ? 'Cada semana' : `Día ${expense.dayOfMonth}`} • ${daysUntil === 0 ? 'hoy' : `en ${daysUntil} días`}`,
     };
@@ -120,24 +125,28 @@ function getExpensePaymentMeta(expense, date = new Date()) {
 
   if (expense.type === 'Única') {
     const targetDate = toDate(expense.dueDate);
-    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate());
     const isOverdue = targetDate < today;
     const daysUntil = isOverdue ? 0 : Math.ceil((targetDate - today) / 86400000);
+    const overdueDays = isOverdue ? Math.floor((today - targetDate) / 86400000) : 0;
 
     return {
       daysUntil,
+      overdueDays,
       status: isOverdue ? 'vencido' : daysUntil <= 3 ? 'proximo' : 'normal',
       label: `Única • ${isOverdue ? 'vencido' : daysUntil === 0 ? 'hoy' : `en ${daysUntil} días`}`,
     };
   }
 
   const targetDate = new Date(date.getFullYear(), date.getMonth(), Number(expense.dayOfMonth || 1));
-  const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const today = new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate());
   const isOverdue = targetDate < today;
   const daysUntil = isOverdue ? 0 : Math.ceil((targetDate - today) / 86400000);
+  const overdueDays = isOverdue ? Math.floor((today - targetDate) / 86400000) : 0;
 
   return {
     daysUntil,
+    overdueDays,
     status: isOverdue ? 'vencido' : daysUntil <= 3 ? 'proximo' : 'normal',
     label: `Día ${expense.dayOfMonth} • ${isOverdue ? 'vencido' : daysUntil === 0 ? 'hoy' : `en ${daysUntil} días`}`,
   };
@@ -161,7 +170,9 @@ export function getFixedExpensesCalendar(fixedExpenses, date = new Date()) {
     if (expense.type === 'Semanal') return acc;
 
     const key = eventDate.toISOString().slice(0, 10);
-    const eventMeta = getExpensePaymentMeta(expense, date);
+    // use today's real date to determine if an expense is overdue,
+    // but use `date` for placement (month) calculations
+    const eventMeta = getExpensePaymentMeta(expense, date, new Date());
 
     if (!acc[key]) acc[key] = [];
     acc[key].push({ ...expense, ...eventMeta });
@@ -197,6 +208,8 @@ export function getUpcomingPayments(fixedExpenses, date = new Date()) {
       ...expense,
       ...getExpensePaymentMeta(expense, date),
     }))
+    // exclude overdue items older than 3 days so upcoming pending payments show instead
+    .filter((e) => !(e.status === 'vencido' && (e.overdueDays || 0) > 3))
     .sort((a, b) => statusPriority[a.status] - statusPriority[b.status] || a.daysUntil - b.daysUntil)
     .slice(0, 5);
 }
@@ -261,6 +274,51 @@ export function summarizeFinances(state, date = new Date()) {
   });
   const trendInsights = getTrendInsights({ settings, fixedExpenses, movements, goals, investments }, date);
 
+  // build category trends for the last 6 months
+  const categoryTrends = (() => {
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const d = new Date(date);
+      d.setMonth(date.getMonth() - (5 - index));
+      return {
+        start: startOfMonth(d),
+        end: endOfMonth(d),
+        label: d.toLocaleDateString('es-MX', { month: 'short' }),
+      };
+    });
+
+    // totals per month per category
+    const monthlyTotals = months.map((m) => {
+      const monthMovements = movements.filter((movement) => isBetween(movement.date, m.start, m.end));
+      return monthMovements
+        .filter((mov) => mov.type === 'Gasto')
+        .reduce((acc, mov) => {
+          acc[mov.category] = (acc[mov.category] || 0) + Number(mov.amount || 0);
+          return acc;
+        }, {});
+    });
+
+    // determine top categories by cumulative sum across months
+    const cumulative = monthlyTotals.reduce((acc, month) => {
+      Object.entries(month).forEach(([cat, val]) => { acc[cat] = (acc[cat] || 0) + val; });
+      return acc;
+    }, {});
+
+    const topCategories = Object.entries(cumulative)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+
+    const series = months.map((m, idx) => {
+      const row = { month: m.label };
+      topCategories.forEach((cat) => {
+        row[cat] = monthlyTotals[idx][cat] || 0;
+      });
+      return row;
+    });
+
+    return { months: months.map((m) => m.label), topCategories, series };
+  })();
+
   return {
     monthName,
     monthlySavingsGoal: Number(settings.monthlySavingsGoal || 0),
@@ -278,6 +336,7 @@ export function summarizeFinances(state, date = new Date()) {
     goalsProgress,
     upcomingPayments: getUpcomingPayments(fixedExpenses, date),
     fixedExpensesCalendar: getFixedExpensesCalendar(fixedExpenses, date),
+    categoryTrends: categoryTrends,
     categoryData: getCategoryData(monthMovements),
     weeklyBars: [
       { name: 'Presupuesto', monto: weeklyBudget },
