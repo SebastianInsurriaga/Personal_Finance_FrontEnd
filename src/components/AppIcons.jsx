@@ -48,6 +48,10 @@ export function SaveIcon(props) {
   return <SvgIcon {...props}><path d="M5 3h12l2 2v16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 2v6h9V5H7Zm0 10v4h10v-4H7Z" /></SvgIcon>;
 }
 
+export function PdfIcon(props) {
+  return <SvgIcon {...props}><path d="M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 2H6v16h11V7h-3V4Zm-6 8h2.5a2 2 0 1 1 0 4H10v2H8v-6Zm2 1.5v1h.5a.5.5 0 0 0 0-1H10Zm3-1.5h2a2 2 0 0 1 0 4h-.5v2H13v-6Zm1.5 1.5v1h.5a.5.5 0 0 0 0-1h-.5Z" /></SvgIcon>;
+}
+
 export function TrendIcon(props) {
   return <SvgIcon {...props}><path d="m4 17 6-6 4 4 6-8v5h2V4h-8v2h4.2L13.7 12 10 8.3 2.6 15.6 4 17Z" /></SvgIcon>;
 }

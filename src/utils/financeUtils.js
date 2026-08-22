@@ -326,6 +326,7 @@ export function summarizeFinances(state, date = new Date()) {
     automaticWeekly,
     weeklyExpenses,
     monthlyExpenses,
+    monthlyIncome,
     weeklyAvailable,
     remainingPercent,
     savingsThisMonth,
