@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
-import { AddIcon, DeleteIcon, EditIcon, SaveIcon } from '../components/AppIcons.jsx';
+import { AddIcon, DeleteIcon, EditIcon, PdfIcon, SaveIcon } from '../components/AppIcons.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
 import { goalColors, initialData } from '../data/initialData.js';
 import { useFinance } from '../context/FinanceContext.jsx';
@@ -30,6 +30,8 @@ import { exportStateToJson, importStateFromJson } from '../services/storageServi
 import { getInvestmentReturns } from '../utils/financeUtils.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { CircularProgress } from '@mui/material';
+import { generateFinancialReport } from '../services/pdfReportService.js';
+import { generateAnnualFinancialReport } from '../services/annualPdfReportService.js';
 
 const emptyGoal = { name: '', targetAmount: '', currentAmount: '', color: goalColors[0], status: 'activa' };
 const emptyInvestment = { name: '', capital: '', annualRate: '' };
@@ -45,6 +47,8 @@ export default function Settings() {
   const [investmentEditForm, setInvestmentEditForm] = useState(emptyInvestment);
   const [expenseEditForm, setExpenseEditForm] = useState(emptyExpense);
   const [isJsonProcessing, setIsJsonProcessing] = useState(false);
+  const [isPdfProcessing, setIsPdfProcessing] = useState(false);
+  const [isAnnualPdfProcessing, setIsAnnualPdfProcessing] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [editingInvestment, setEditingInvestment] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -54,6 +58,8 @@ export default function Settings() {
   const investments = getInvestmentReturns(state.investments);
   const fileInputRef = useRef(null);
   const [alert, setAlert] = useState({ open: false, message: '', severity: 'success' });
+  const currentYear = new Date().getFullYear();
+  const [selectedReportMonth, setSelectedReportMonth] = useState(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
 
   const showAlert = (message, severity = 'success') => {
     setAlert({ open: true, message, severity });
@@ -222,6 +228,32 @@ export default function Settings() {
     }
   };
 
+  const handleGenerateReport = () => {
+    try {
+      setIsPdfProcessing(true);
+      generateFinancialReport(state, selectedReportMonth);
+      showAlert('Reporte PDF generado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al generar reporte:', error);
+      showAlert('No se pudo generar el reporte PDF.', 'error');
+    } finally {
+      setIsPdfProcessing(false);
+    }
+  };
+
+  const handleGenerateAnnualReport = () => {
+    try {
+      setIsAnnualPdfProcessing(true);
+      generateAnnualFinancialReport(state, currentYear);
+      showAlert('Reporte anual PDF generado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al generar reporte anual:', error);
+      showAlert('No se pudo generar el reporte anual PDF.', 'error');
+    } finally {
+      setIsAnnualPdfProcessing(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <SectionHeader title="Configuración" subtitle="Define la estrategia que alimenta todo el dashboard." />
@@ -242,6 +274,37 @@ export default function Settings() {
             Exporta toda la información de la app para moverla a otro navegador o dispositivo.
           </Typography>
           <input ref={fileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={handleImportData} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+            <Box>
+              <Typography variant="h6">Reporte financiero</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Descarga un resumen con totales, gráficas, movimientos, metas, inversiones y gastos fijos.
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="stretch">
+              <FormControl sx={{ minWidth: 185 }} size="small">
+                <InputLabel id="report-month-label">Mes del reporte</InputLabel>
+                <Select labelId="report-month-label" label="Mes del reporte" value={selectedReportMonth} onChange={(event) => setSelectedReportMonth(event.target.value)}>
+                  {Array.from({ length: 12 }, (_, index) => {
+                    const value = `${currentYear}-${String(index + 1).padStart(2, '0')}`;
+                    const label = new Date(currentYear, index, 1).toLocaleDateString('es-MX', { month: 'long' });
+                    return <MenuItem key={value} value={value}>{label[0].toUpperCase() + label.slice(1)} {currentYear}</MenuItem>;
+                  })}
+                </Select>
+              </FormControl>
+              <Button startIcon={isPdfProcessing ? <CircularProgress size={18} color="inherit" /> : <PdfIcon />} variant="contained" onClick={handleGenerateReport} disabled={isPdfProcessing}>
+                {isPdfProcessing ? 'Generando...' : 'Reporte mensual'}
+              </Button>
+              <Button startIcon={isAnnualPdfProcessing ? <CircularProgress size={18} color="inherit" /> : <PdfIcon />} variant="outlined" onClick={handleGenerateAnnualReport} disabled={isPdfProcessing || isAnnualPdfProcessing}>
+                {isAnnualPdfProcessing ? 'Generando...' : 'Reporte anual'}
+              </Button>
+            </Stack>
+          </Box>
         </CardContent>
       </Card>
 
