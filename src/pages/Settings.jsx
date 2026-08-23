@@ -186,7 +186,8 @@ export default function Settings() {
         return;
       }
 
-      const response = await fetch('/api/send-email', {
+      const emailEndpoint = import.meta.env.DEV ? '/api/send-email' : '/.netlify/functions/send-email';
+      const response = await fetch(emailEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
