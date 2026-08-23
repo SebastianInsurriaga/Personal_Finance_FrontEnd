@@ -1,10 +1,13 @@
 import nodemailer from 'nodemailer';
 
-exports.handler = async (event, context) => {
+export async function handler(event) {
+  const jsonHeaders = { 'Content-Type': 'application/json' };
+
   // Solo POST
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers: jsonHeaders,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -12,17 +15,14 @@ exports.handler = async (event, context) => {
   try {
     let body;
     
-    if (typeof event.body === 'string') {
-      body = JSON.parse(event.body);
-    } else {
-      body = event.body;
-    }
+    body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 
-    const { jsonData, userEmail } = body;
+    const { jsonData, userEmail } = body || {};
 
     if (!jsonData || !userEmail) {
       return {
         statusCode: 400,
+        headers: jsonHeaders,
         body: JSON.stringify({ 
           error: 'Missing required fields',
           details: 'jsonData and userEmail are required' 
@@ -41,6 +41,7 @@ exports.handler = async (event, context) => {
       });
       return {
         statusCode: 500,
+        headers: jsonHeaders,
         body: JSON.stringify({ 
           error: 'Server configuration error',
           details: 'Gmail credentials not configured on server'
@@ -64,6 +65,7 @@ exports.handler = async (event, context) => {
       console.error('Gmail authentication failed:', verifyError.message);
       return {
         statusCode: 401,
+        headers: jsonHeaders,
         body: JSON.stringify({ 
           error: 'Gmail authentication failed',
           details: 'Verify your Gmail credentials in environment variables'
@@ -99,9 +101,7 @@ exports.handler = async (event, context) => {
     
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: jsonHeaders,
       body: JSON.stringify({ 
         success: true, 
         message: 'Email enviado correctamente',
@@ -112,6 +112,7 @@ exports.handler = async (event, context) => {
     console.error('Error enviando email:', error);
     return {
       statusCode: 500,
+      headers: jsonHeaders,
       body: JSON.stringify({ 
         error: 'Error al enviar el email',
         details: error.message

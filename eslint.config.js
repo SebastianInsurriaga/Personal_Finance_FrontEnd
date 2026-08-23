@@ -27,4 +27,10 @@ export default [
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true, allowExportNames: ['useFinance'] }],
     },
   },
+  {
+    files: ['netlify/functions/**/*.js', 'api/**/*.js', 'server-dev.js', 'test-gmail.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ];
