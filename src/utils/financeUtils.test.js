@@ -157,3 +157,17 @@ test('last savings trend point matches savingsThisMonth for the selected month',
 
   assert.equal(Math.round(lastPoint.ahorro), Math.round(summary.savingsThisMonth));
 });
+
+test('savings trend creates unique month labels when selected date is at month end', () => {
+  const state = {
+    settings: { weeklyBudget: 10000, monthlySavingsGoal: 12400, currentNetWorth: 100000 },
+    fixedExpenses: [],
+    movements: [],
+    goals: [],
+    investments: [],
+  };
+
+  const summary = summarizeFinances(state, new Date('2026-08-31'));
+
+  assert.deepEqual(summary.savingsTrend.map((point) => point.month), ['mar', 'abr', 'may', 'jun', 'jul', 'ago']);
+});

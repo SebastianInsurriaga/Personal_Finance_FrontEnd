@@ -60,7 +60,7 @@ export default function FinancialCharts({ categoryData, weeklyBars, savingsTrend
           </LineChart>
         </ResponsiveContainer>
       </ChartCard>
-      <ChartCard title="Tendencia por categoría (top 3)">
+      <ChartCard title="Tendencia por categoría (top 5)">
         {categoryTrends && categoryTrends.series && categoryTrends.series.length ? (
           <ResponsiveContainer>
             <LineChart data={categoryTrends.series} margin={{ right: 24 }}>

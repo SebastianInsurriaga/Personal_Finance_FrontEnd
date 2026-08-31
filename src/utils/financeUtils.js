@@ -307,12 +307,12 @@ export function summarizeFinances(state, date = new Date()) {
   // build category trends for the last 6 months
   const categoryTrends = (() => {
     const months = Array.from({ length: 6 }, (_, index) => {
-      const d = new Date(date);
-      d.setMonth(date.getMonth() - (5 - index));
+      const monthOffset = 5 - index;
+      const monthDate = new Date(date.getFullYear(), date.getMonth() - monthOffset, 1);
       return {
-        start: startOfMonth(d),
-        end: endOfMonth(d),
-        label: d.toLocaleDateString('es-MX', { month: 'short' }),
+        start: startOfMonth(monthDate),
+        end: endOfMonth(monthDate),
+        label: monthDate.toLocaleDateString('es-MX', { month: 'short' }),
       };
     });
 
@@ -482,11 +482,12 @@ function getSavingsTrend(movements, fixedExpenses, investments, selectedDate) {
     .sort((a, b) => a - b)[0];
 
   return Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(currentReference);
-    date.setMonth(currentReference.getMonth() - (5 - index));
-    const start = startOfMonth(date);
-    const end = endOfMonth(date);
-    const monthLabel = date.toLocaleDateString('es-MX', { month: 'short' });
+    const monthOffset = 5 - index;
+    const monthStart = new Date(currentReference.getFullYear(), currentReference.getMonth() - monthOffset, 1);
+    const activeDate = monthOffset === 0 ? currentReference : endOfMonth(monthStart);
+    const start = startOfMonth(monthStart);
+    const end = endOfMonth(monthStart);
+    const monthLabel = monthStart.toLocaleDateString('es-MX', { month: 'short' });
 
     if (firstMovementDate && end < startOfMonth(firstMovementDate)) {
       return {
@@ -495,7 +496,7 @@ function getSavingsTrend(movements, fixedExpenses, investments, selectedDate) {
       };
     }
 
-    const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
+    const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, activeDate);
     const monthMovements = getMovementsExcludingAutomaticDuplicates(
       movements.filter((movement) => isBetween(movement.date, start, end)),
       fixedExpenses,
@@ -508,10 +509,7 @@ function getSavingsTrend(movements, fixedExpenses, investments, selectedDate) {
     const income = monthMovements
       .filter((movement) => movement.type === 'Ingreso')
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
-    const referenceDate = date.getMonth() === currentReference.getMonth() && date.getFullYear() === currentReference.getFullYear()
-      ? currentReference
-      : endOfMonth(date);
-    const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, date, referenceDate);
+    const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, monthStart, activeDate);
 
     return {
       month: monthLabel,
