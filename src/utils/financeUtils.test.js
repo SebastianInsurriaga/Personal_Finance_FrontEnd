@@ -171,3 +171,24 @@ test('savings trend creates unique month labels when selected date is at month e
 
   assert.deepEqual(summary.savingsTrend.map((point) => point.month), ['mar', 'abr', 'may', 'jun', 'jul', 'ago']);
 });
+
+test('starts a brand-new month at zero when no movement has been recorded yet', () => {
+  const state = {
+    settings: { weeklyBudget: 5000, monthlySavingsGoal: 8000, currentNetWorth: 10000 },
+    fixedExpenses: [
+      { id: 'seguro', name: 'Seguro', active: true, automatic: true, type: 'Mensual', amount: 116, dayOfMonth: 1 },
+      { id: 'gasolina', name: 'Gasolina', active: true, automatic: true, type: 'Semanal', amount: 400 },
+      { id: 'amazon', name: 'Amazon sin anuncios', active: true, automatic: true, type: 'Mensual', amount: 50, dayOfMonth: 1 },
+    ],
+    movements: [
+      { id: 'old-income', type: 'Ingreso', amount: 4458, date: '2026-08-28', concept: 'Pago nomina', category: 'Nomina' },
+    ],
+    goals: [],
+    investments: [],
+  };
+
+  const summary = summarizeFinances(state, new Date('2026-09-01'));
+
+  assert.equal(summary.savingsThisMonth, 0);
+  assert.equal(summary.savingsTrend[summary.savingsTrend.length - 1].ahorro, 0);
+});

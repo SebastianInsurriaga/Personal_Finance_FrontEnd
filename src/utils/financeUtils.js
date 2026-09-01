@@ -292,7 +292,8 @@ export function summarizeFinances(state, date = new Date()) {
   const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, date, date);
   const shouldAdjustNetWorthForSync = !settings.lastNetWorthSyncDate;
   const netWorthBase = Number(settings.currentNetWorth || 0) - (shouldAdjustNetWorthForSync ? monthlyAutomaticExpenses : 0);
-  const savingsThisMonth = monthlyIncome + monthlyReturns - monthlyExpenses;
+  const hasRecordedMonthActivity = monthMovements.some((movement) => movement.type === 'Ingreso' || movement.type === 'Gasto');
+  const savingsThisMonth = hasRecordedMonthActivity ? monthlyIncome + monthlyReturns - monthlyExpenses : 0;
   const netWorth = netWorthBase + monthlyReturns;
   const goalsProgress = goals.map((goal) => {
     const isCompleted = goal.status === 'terminada';
@@ -510,10 +511,11 @@ function getSavingsTrend(movements, fixedExpenses, investments, selectedDate) {
       .filter((movement) => movement.type === 'Ingreso')
       .reduce((sum, movement) => sum + Number(movement.amount), 0);
     const monthlyReturns = getProratedInvestmentReturnsForMonth(investments, monthStart, activeDate);
+    const hasRecordedMonthActivity = monthMovements.some((movement) => movement.type === 'Ingreso' || movement.type === 'Gasto');
 
     return {
       month: monthLabel,
-      ahorro: income - expenses - monthlyAutomaticExpenses + monthlyReturns,
+      ahorro: hasRecordedMonthActivity ? income - expenses - monthlyAutomaticExpenses + monthlyReturns : 0,
     };
   });
 }
