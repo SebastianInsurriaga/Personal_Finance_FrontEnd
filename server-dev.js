@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import handler from './api/send-email.js';
+import chatHandler from './api/chat.js';
 
 // Cargar variables de entorno
 dotenv.config({ path: '.env.local' });
@@ -23,6 +24,7 @@ app.use((req, res, next) => {
 
 // Rutas
 app.post('/send-email', handler);
+app.post('/chat', chatHandler);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

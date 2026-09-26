@@ -4,6 +4,18 @@ export function WalletIcon(props) {
   return <SvgIcon {...props}><path d="M3 7.5A3.5 3.5 0 0 1 6.5 4H19a2 2 0 0 1 2 2v2h-4.5a4.5 4.5 0 0 0 0 9H21v1a2 2 0 0 1-2 2H6.5A3.5 3.5 0 0 1 3 16.5v-9Zm13.5 3H21V15h-4.5a2.25 2.25 0 0 1 0-4.5Zm0 3.25a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" /></SvgIcon>;
 }
 
+export function ChatIcon(props) {
+  return <SvgIcon {...props}><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 14H5.17L4 17.17V4h16v12Z" /><path d="M7 8h10v2H7zm0 4h7v2H7z" /></SvgIcon>;
+}
+
+export function CloseIcon(props) {
+  return <SvgIcon {...props}><path d="m19 6.41-1.41-1.41L12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></SvgIcon>;
+}
+
+export function SendIcon(props) {
+  return <SvgIcon {...props}><path d="M2 21 23 12 2 3v7l15 2-15 2z" /></SvgIcon>;
+}
+
 export function DashboardIcon(props) {
   return <SvgIcon {...props}><path d="M4 4h7v7H4V4Zm9 0h7v4h-7V4ZM4 13h7v7H4v-7Zm9-3h7v10h-7V10Z" /></SvgIcon>;
 }

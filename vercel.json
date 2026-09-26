@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "env": {
     "GMAIL_USER": "@gmail_user",
-    "GMAIL_PASSWORD": "@gmail_password"
+    "GMAIL_PASSWORD": "@gmail_password",
+    "GEMINI_API_KEY": "@gemini_api_key"
   }
 }
