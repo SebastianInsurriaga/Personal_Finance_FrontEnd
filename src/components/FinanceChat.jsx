@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Button, IconButton, Paper, TextField, Tooltip, Typography } from '@mui/material';
 import { useFinance } from '../context/FinanceContext.jsx';
+import { loadState } from '../services/storageService.js';
+import { buildFinanceChatFacts, getDeterministicFinanceReply, resolveFinanceChatPeriod } from '../utils/financeChatAnalysis.js';
 import { ChatIcon, CloseIcon, SendIcon } from './AppIcons.jsx';
 
 const greeting = {
@@ -69,6 +71,10 @@ export default function FinanceChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Netlify devolvió una página en vez de la respuesta del chat. Verifica que la función y sus redirecciones estén desplegadas.');
+      }
       const result = await response.json();
       if (!response.ok) {
         const error = new Error(result.error || 'No se pudo obtener una respuesta.');
@@ -94,22 +100,15 @@ export default function FinanceChat() {
     if (!text || sending) return;
 
     const userMessage = { role: 'user', text };
+    const savedState = loadState(state);
+    const referenceDate = new Date();
+    const requestedPeriod = resolveFinanceChatPeriod(text, savedState.movements, referenceDate);
+    const financialData = buildFinanceChatFacts(savedState, referenceDate, requestedPeriod, text);
+    const verifiedAnalysis = getDeterministicFinanceReply(text, financialData);
     const conversation = [...messages.slice(1).filter((message) => !message.isError), userMessage]
       .map(({ role, text: messageText }) => ({ role, text: messageText }))
       .slice(-10);
-    const movements = [...state.movements]
-      .sort((first, second) => String(second.date).localeCompare(String(first.date)))
-      .slice(0, 250);
-    const financialData = {
-      asOf: new Date().toISOString().slice(0, 10),
-      settings: state.settings,
-      goals: state.goals,
-      investments: state.investments,
-      fixedExpenses: state.fixedExpenses,
-      movements,
-      omittedMovementCount: Math.max(0, state.movements.length - movements.length),
-    };
-    const request = { financialData, messages: conversation };
+    const request = { financialData, messages: conversation, verifiedAnalysis };
 
     lastRequestRef.current = request;
     setMessages((current) => [
