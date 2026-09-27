@@ -104,7 +104,7 @@ export default function Settings() {
       showAlert(temporalExpense.error, 'error');
       return;
     }
-    dispatch({ type: 'ADD_FIXED_EXPENSE', payload: normalizeNumbers(temporalExpense) });
+    dispatch({ type: 'ADD_FIXED_EXPENSE', payload: normalizeNumbers({ ...temporalExpense, startDate: temporalExpense.startDate || todayKey() }) });
     setExpense({ ...emptyExpense });
     showAlert('Gasto fijo agregado con éxito', 'success');
   };

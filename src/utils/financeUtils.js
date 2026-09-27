@@ -243,7 +243,7 @@ export function getUpcomingPayments(fixedExpenses, date = new Date()) {
     .slice(0, 5);
 }
 
-function getMovementsExcludingAutomaticDuplicates(movements, fixedExpenses, start, end) {
+export function getMovementsExcludingAutomaticDuplicates(movements, fixedExpenses, start, end) {
   const automaticExpenses = fixedExpenses.filter((expense) => expense.active && expense.automatic);
 
   return movements.filter((movement) => {
