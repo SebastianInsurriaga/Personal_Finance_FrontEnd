@@ -37,6 +37,28 @@ test('calculates weekly budget and savings facts once when an automatic fixed ex
     assert.match(reply, /Ahorro:/);
 });
 
+test('excludes opted-out expenses from weekly budget facts but keeps them in recorded spending', () => {
+  const state = {
+    settings: { weeklyBudget: 500 },
+    fixedExpenses: [],
+    movements: [
+      { date: '2026-07-06', type: 'Ingreso', amount: 1000, concept: 'Paycheck' },
+      { date: '2026-07-06', type: 'Gasto', amount: 400, category: 'Hogar', concept: 'Repair', excludeFromWeeklyBudget: true },
+      { date: '2026-07-06', type: 'Gasto', amount: 200, category: 'Comida', concept: 'Groceries' },
+      { date: '2026-07-13', type: 'Ingreso', amount: 1000, concept: 'Paycheck' },
+    ],
+    goals: [],
+    investments: [],
+  };
+
+  const facts = buildFinanceChatFacts(state, new Date('2026-07-20T12:00:00'));
+
+  assert.equal(facts.weeklyBudget.exceededCount, 0);
+  assert.equal(facts.weeklyBudget.totalUnderBudgetMargin, 800);
+  assert.equal(facts.savings.recordedExpenses, 600);
+  assert.equal(facts.savings.registeredNetSavings, 1400);
+});
+
 test('includes the complete stored movement history instead of limiting it to 250 entries', () => {
   const movements = Array.from({ length: 300 }, (_, index) => ({
     date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),

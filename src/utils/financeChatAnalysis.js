@@ -184,11 +184,12 @@ export function buildFinanceChatFacts(state, referenceDate = new Date(), selecte
       const uniqueMovements = getMovementsExcludingAutomaticDuplicates(weekMovements, fixedExpenses, start, end);
       const income = amountTotal(uniqueMovements, 'Ingreso');
       const variableExpenses = amountTotal(uniqueMovements, 'Gasto');
+      const budgetExpenses = amountTotal(uniqueMovements.filter((movement) => !movement.excludeFromWeeklyBudget), 'Gasto');
       const recordedExpenses = amountTotal(weekMovements, 'Gasto');
       const fixedExpensesDue = getAutomaticFixedExpenses(fixedExpenses, end)
         .reduce((total, expense) => total + Number(expense.amount || 0), 0);
       const budget = Number(state.settings?.weeklyBudget || 0);
-      const totalExpenses = variableExpenses + fixedExpensesDue;
+      const totalExpenses = budgetExpenses + fixedExpensesDue;
 
       return {
         start: dateKey(start),
@@ -196,6 +197,7 @@ export function buildFinanceChatFacts(state, referenceDate = new Date(), selecte
         income,
         recordedExpenses,
         variableExpenses,
+        budgetExpenses,
         automaticFixedExpenses: fixedExpensesDue,
         totalExpenses,
         budget,

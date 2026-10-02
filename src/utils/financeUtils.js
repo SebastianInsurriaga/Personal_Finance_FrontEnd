@@ -277,7 +277,7 @@ export function summarizeFinances(state, date = new Date()) {
 
   const weekMovements = getMovementsExcludingAutomaticDuplicates(movements.filter((movement) => isBetween(movement.date, weekStart, weekEnd)), fixedExpenses, weekStart, weekEnd);
   const monthMovements = getMovementsExcludingAutomaticDuplicates(movements.filter((movement) => isBetween(movement.date, monthStart, monthEnd)), fixedExpenses, monthStart, monthEnd);
-  const weeklyExpenses = weekMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
+  const weeklyExpenses = weekMovements.filter((movement) => movement.type === 'Gasto' && !movement.excludeFromWeeklyBudget).reduce((sum, movement) => sum + Number(movement.amount), 0);
   const monthlyManualExpenses = monthMovements.filter((movement) => movement.type === 'Gasto').reduce((sum, movement) => sum + Number(movement.amount), 0);
   const monthlyAutomaticExpenses = getMonthlyAutomaticFixedExpenses(fixedExpenses, date);
   const monthlyExpenses = monthlyManualExpenses + monthlyAutomaticExpenses;

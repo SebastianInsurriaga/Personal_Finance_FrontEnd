@@ -77,6 +77,27 @@ test('includes monthly automatic fixed expenses in monthly expense totals and sa
   assert.equal(summary.savingsThisMonth, 4458 - 116 - 400 - 409);
 });
 
+test('excludes opted-out expenses from the weekly budget but keeps them in monthly totals and savings', () => {
+  const state = {
+    settings: { weeklyBudget: 500, monthlySavingsGoal: 0, currentNetWorth: 0 },
+    fixedExpenses: [],
+    movements: [
+      { id: 'income', type: 'Ingreso', amount: 1000, date: '2026-07-11', concept: 'Pago', category: 'Salario' },
+      { id: 'excluded', type: 'Gasto', amount: 200, date: '2026-07-11', concept: 'Gasto fuera del presupuesto', category: 'Otros', excludeFromWeeklyBudget: true },
+      { id: 'included', type: 'Gasto', amount: 100, date: '2026-07-11', concept: 'Gasto presupuestado', category: 'Otros' },
+    ],
+    goals: [],
+    investments: [],
+  };
+
+  const summary = summarizeFinances(state, new Date('2026-07-11'));
+
+  assert.equal(summary.weeklyExpenses, 100);
+  assert.equal(summary.weeklyAvailable, 400);
+  assert.equal(summary.monthlyExpenses, 300);
+  assert.equal(summary.savingsThisMonth, 700);
+});
+
 test('reduces net worth when automatic fixed expenses have already become due and config was not synced yet', () => {
   const state = {
     settings: { weeklyBudget: 5000, monthlySavingsGoal: 8000, currentNetWorth: 10000 },

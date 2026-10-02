@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, IconButton, InputLabel, MenuItem, Select, Snackbar, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, IconButton, InputLabel, MenuItem, Select, Snackbar, Stack, Switch, TextField, Tooltip, Typography } from '@mui/material';
 import { useState } from 'react';
 import { AddIcon, DeleteIcon, EditIcon } from '../components/AppIcons.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -13,6 +13,7 @@ const createEmptyMovement = () => ({
   category: 'Otros',
   amount: '',
   type: 'Gasto',
+  excludeFromWeeklyBudget: false,
   notes: '',
 });
 
@@ -82,6 +83,13 @@ export default function Movements() {
             <TextField type="number" label="Monto" value={movement.amount} onChange={(event) => setMovement({ ...movement, amount: event.target.value })} />
             <FormControl><InputLabel>Tipo</InputLabel><Select label="Tipo" value={movement.type} onChange={(event) => setMovement({ ...movement, type: event.target.value })}><MenuItem value="Ingreso">Ingreso</MenuItem><MenuItem value="Gasto">Gasto</MenuItem></Select></FormControl>
           </Box>
+          {movement.type === 'Gasto' && (
+            <FormControlLabel
+              control={<Switch checked={movement.excludeFromWeeklyBudget} onChange={(event) => setMovement({ ...movement, excludeFromWeeklyBudget: event.target.checked })} />}
+              label="Excluir del presupuesto semanal"
+              sx={{ mt: 1 }}
+            />
+          )}
           <TextField fullWidth multiline minRows={2} label="Notas" value={movement.notes} sx={{ mt: 2 }} onChange={(event) => setMovement({ ...movement, notes: event.target.value })} />
           <Button variant="contained" startIcon={<AddIcon />} sx={{ mt: 2 }} onClick={() => handleSaveMovement(false)}>Registrar movimiento</Button>
         </CardContent>
